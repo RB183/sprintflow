@@ -1,0 +1,29 @@
+{
+  "name": "sprintflow",
+  "version": "1.0.0",
+  "description": "SprintFlow - Enterprise Agile Project Management & Whiteboard Suite (MERN)",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --prefix frontend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "build": "npm run build --prefix frontend",
+    "install:all": "npm install --prefix frontend && npm install --prefix backend"
+  },
+  "keywords": [
+    "mern",
+    "kanban",
+    "jira-clone",
+    "react",
+    "express",
+    "mongodb",
+    "socket-io",
+    "whiteboard"
+  ],
+  "author": "SprintFlow Engineering",
+  "license": "MIT"
+}
