@@ -3,7 +3,7 @@ import { Kanban, GitPullRequest, ArrowRight, Layers, CheckCircle2, MessageSquare
 
 export function WorkflowShowcase({ onEnterApp }) {
   return (
-    <section className="py-24 bg-[#fafbfc] text-[#172b4d] space-y-28 overflow-hidden">
+    <section className="py-24 bg-[var(--landing-surface)] text-[var(--app-text)] space-y-28 overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-28">
 
         {/* 1. Customize how your team's work flows */}

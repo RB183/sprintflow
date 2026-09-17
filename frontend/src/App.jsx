@@ -1,23 +1,30 @@
-import React from 'react';
+import React, { lazy, Suspense, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
+import { ThemeProvider } from './context/ThemeContext';
 import { LandingPage } from './components/landing/LandingPage';
 import { AppNavbar } from './components/layout/AppNavbar';
-import { PersonalWorkspace } from './components/personal/PersonalWorkspace';
-import { TeamSpaceHeader } from './components/team/TeamSpaceHeader';
-import { HackerKanbanBoard } from './components/board/HackerKanbanBoard';
-import { HackerRoadmap } from './components/roadmap/HackerRoadmap';
-import { WhiteboardCanvas } from './components/canvas/WhiteboardCanvas';
-import { TerminalChat } from './components/chat/TerminalChat';
 import { AuthModal } from './components/auth/AuthModal';
+import { SidebarNavigation } from './components/layout/SidebarNavigation';
+import { PageSkeleton } from './components/common/PageSkeleton';
+
+const PersonalWorkspace = lazy(() => import('./components/personal/PersonalWorkspace').then((module) => ({ default: module.PersonalWorkspace })));
+const TeamSpaceHeader = lazy(() => import('./components/team/TeamSpaceHeader').then((module) => ({ default: module.TeamSpaceHeader })));
+const HackerKanbanBoard = lazy(() => import('./components/board/HackerKanbanBoard').then((module) => ({ default: module.HackerKanbanBoard })));
+const HackerRoadmap = lazy(() => import('./components/roadmap/HackerRoadmap').then((module) => ({ default: module.HackerRoadmap })));
+const WhiteboardCanvas = lazy(() => import('./components/canvas/WhiteboardCanvas').then((module) => ({ default: module.WhiteboardCanvas })));
+const TerminalChat = lazy(() => import('./components/chat/TerminalChat').then((module) => ({ default: module.TerminalChat })));
+const WorkspacePage = lazy(() => import('./components/layout/WorkspacePage').then((module) => ({ default: module.WorkspacePage })));
 
 function MainApp() {
   const {
     viewMode,
     teamTab,
+    workspacePage,
     isAuthModalOpen,
     setIsAuthModalOpen,
     login,
   } = useApp();
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   if (viewMode === 'landing') {
     return (
@@ -33,22 +40,29 @@ function MainApp() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f4f5f7] text-[#172b4d] font-sans flex flex-col">
-      <AppNavbar />
+    <div className="min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] font-sans flex flex-col">
+      <AppNavbar onToggleSidebar={() => setIsSidebarOpen(true)} />
 
-      <main className="flex-1 pb-10">
-        {viewMode === 'personal' ? (
-          <PersonalWorkspace />
-        ) : (
-          <div className="space-y-2">
-            <TeamSpaceHeader />
-            {teamTab === 'board' && <HackerKanbanBoard />}
-            {teamTab === 'roadmap' && <HackerRoadmap />}
-            {teamTab === 'canvas' && <WhiteboardCanvas />}
-            {teamTab === 'chat' && <TerminalChat />}
-          </div>
-        )}
-      </main>
+      <div className="flex flex-1">
+        <SidebarNavigation isMobileOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+        <main className="min-w-0 flex-1 pb-10" aria-busy="false">
+          <Suspense fallback={<PageSkeleton variant={workspacePage === 'personal' || workspacePage === 'dashboards' ? 'personal' : workspacePage === 'roadmaps' || teamTab === 'roadmap' ? 'roadmap' : workspacePage === 'projects' || workspacePage === 'spaces' ? 'board' : 'workspace'} />}>
+          {workspacePage === 'personal' || workspacePage === 'dashboards' ? (
+            <PersonalWorkspace />
+          ) : workspacePage === 'projects' || workspacePage === 'spaces' || workspacePage === 'roadmaps' ? (
+            <div className="space-y-2">
+              <TeamSpaceHeader />
+              {teamTab === 'board' && <HackerKanbanBoard />}
+              {teamTab === 'roadmap' && <HackerRoadmap />}
+              {teamTab === 'canvas' && <WhiteboardCanvas />}
+              {teamTab === 'chat' && <TerminalChat />}
+            </div>
+          ) : (
+            <WorkspacePage />
+          )}
+          </Suspense>
+        </main>
+      </div>
 
       <AuthModal
         isOpen={isAuthModalOpen}
@@ -61,8 +75,10 @@ function MainApp() {
 
 export default function App() {
   return (
-    <AppProvider>
-      <MainApp />
-    </AppProvider>
+    <ThemeProvider>
+      <AppProvider>
+        <MainApp />
+      </AppProvider>
+    </ThemeProvider>
   );
 }

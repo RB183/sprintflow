@@ -3,7 +3,7 @@ import { Kanban, Globe, ArrowRight, Sparkles } from 'lucide-react';
 
 export function LandingFooter() {
   return (
-    <footer className="bg-white border-t border-slate-200 text-[#44546f] text-xs pt-16 pb-12">
+    <footer className="bg-[var(--landing-surface)] border-t border-slate-200 text-[#44546f] text-xs pt-16 pb-12">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-5 gap-8 pb-12">
           

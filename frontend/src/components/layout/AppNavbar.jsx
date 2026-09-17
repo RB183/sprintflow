@@ -3,28 +3,31 @@ import {
   Kanban,
   User,
   ChevronDown,
-  Layers,
-  Plus,
   Home,
   LogOut,
-  Sparkles,
   Cpu,
-  Users,
+  Menu,
+  Moon,
+  Sun,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useTheme } from '../../context/ThemeContext';
 import { MOCK_USERS } from '../../data/mockData';
+import { CreateButton } from './CreateButton';
 
-export function AppNavbar() {
+export function AppNavbar({ onToggleSidebar }) {
   const {
     currentUser,
     logout,
     login,
     viewMode,
     setViewMode,
+    navigateTo,
     orgs,
     currentOrg,
     selectOrg,
   } = useApp();
+  const { theme, toggleTheme } = useTheme();
 
   const [isOrgMenuOpen, setIsOrgMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
@@ -34,9 +37,17 @@ export function AppNavbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4 font-sans">
         
         {/* Left: Brand & Navigation */}
-        <div className="flex items-center gap-6">
+        <div className="flex items-center gap-3 sm:gap-6">
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            aria-label="Open workspace navigation"
+            className="rounded-lg p-1.5 text-slate-600 hover:bg-slate-100 hover:text-[#0052cc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052cc] lg:hidden"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
           <div
-            onClick={() => setViewMode('personal')}
+            onClick={() => { setViewMode('personal'); navigateTo('personal'); }}
             className="flex items-center gap-2.5 cursor-pointer group"
           >
             <div className="w-8 h-8 rounded-lg bg-[#0052cc] flex items-center justify-center text-white font-black shadow-sm group-hover:bg-[#0041a8] transition-colors">
@@ -49,12 +60,12 @@ export function AppNavbar() {
             </div>
           </div>
 
-          <div className="h-5 w-px bg-slate-200 hidden sm:block" />
+          <div className="h-5 w-px bg-slate-200 hidden md:block" />
 
           {/* Personal Workspace Switcher */}
           <button
-            onClick={() => setViewMode('personal')}
-            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer ${
+            onClick={() => { setViewMode('personal'); navigateTo('personal'); }}
+            className={`hidden md:flex px-3 py-1.5 rounded-lg text-xs font-bold transition-all items-center gap-1.5 cursor-pointer ${
               viewMode === 'personal'
                 ? 'bg-blue-50 text-[#0052cc] border border-blue-200'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
@@ -65,7 +76,7 @@ export function AppNavbar() {
           </button>
 
           {/* Organization Switcher Dropdown */}
-          <div className="relative">
+          <div className="relative hidden sm:block">
             <button
               onClick={() => setIsOrgMenuOpen(!isOrgMenuOpen)}
               className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-2 cursor-pointer ${
@@ -116,7 +127,17 @@ export function AppNavbar() {
         </div>
 
         {/* Right: Overview link & User Menu */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <CreateButton />
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            className="rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#0052cc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052cc]"
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           {/* Back to Landing Page / Overview */}
           <button
             onClick={() => setViewMode('landing')}

@@ -1,7 +1,10 @@
 import React from 'react';
-import { Kanban, ArrowRight, Zap, Sparkles } from 'lucide-react';
+import { Kanban, ArrowRight, Zap, Sparkles, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../../context/ThemeContext';
 
 export function LandingNavbar({ onOpenAuth, onDemoLogin }) {
+  const { theme, toggleTheme } = useTheme();
+
   return (
     <nav className="w-full bg-white border-b border-slate-200 sticky top-0 z-40">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
@@ -32,6 +35,15 @@ export function LandingNavbar({ onOpenAuth, onDemoLogin }) {
 
         {/* Right CTA Actions */}
         <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={toggleTheme}
+            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
+            className="rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#0052cc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052cc]"
+          >
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+          </button>
           {/* Instant 1-Click Demo */}
           <button
             onClick={onDemoLogin}

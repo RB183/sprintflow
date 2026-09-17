@@ -31,6 +31,15 @@ export function AppProvider({ children }) {
 
   // Active sub-tab inside team space: 'board' | 'roadmap' | 'canvas' | 'chat'
   const [teamTab, setTeamTab] = useState('board');
+  const [workspacePage, setWorkspacePage] = useState('personal');
+  const [recentPages, setRecentPages] = useState(() => {
+    const saved = localStorage.getItem('sprintflow_recent_pages');
+    return saved ? JSON.parse(saved) : ['personal'];
+  });
+  const [starredOrgIds, setStarredOrgIds] = useState(() => {
+    const saved = localStorage.getItem('sprintflow_starred_orgs');
+    return saved ? JSON.parse(saved) : [];
+  });
 
   // Tasks
   const [tasks, setTasks] = useState(() => {
@@ -65,6 +74,14 @@ export function AppProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('sprintflow_light_chat', JSON.stringify(chatMessages));
   }, [chatMessages]);
+
+  useEffect(() => {
+    localStorage.setItem('sprintflow_recent_pages', JSON.stringify(recentPages));
+  }, [recentPages]);
+
+  useEffect(() => {
+    localStorage.setItem('sprintflow_starred_orgs', JSON.stringify(starredOrgIds));
+  }, [starredOrgIds]);
 
   const login = (user) => {
     const activeUser = user || MOCK_USERS[0];
@@ -186,6 +203,18 @@ export function AppProvider({ children }) {
   const selectOrg = (orgId) => {
     setCurrentOrgId(orgId);
     setViewMode('team');
+    setWorkspacePage('projects');
+  };
+
+  const navigateTo = (page) => {
+    setWorkspacePage(page);
+    setRecentPages((previous) => [page, ...previous.filter((item) => item !== page)].slice(0, 6));
+  };
+
+  const toggleStarredOrg = (orgId) => {
+    setStarredOrgIds((previous) =>
+      previous.includes(orgId) ? previous.filter((id) => id !== orgId) : [...previous, orgId]
+    );
   };
 
   return (
@@ -198,6 +227,11 @@ export function AppProvider({ children }) {
         setIsAuthModalOpen,
         viewMode,
         setViewMode,
+        workspacePage,
+        navigateTo,
+        recentPages,
+        starredOrgIds,
+        toggleStarredOrg,
         orgs,
         currentOrg,
         selectOrg,

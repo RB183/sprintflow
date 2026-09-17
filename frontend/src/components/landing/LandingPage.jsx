@@ -31,7 +31,7 @@ export function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white text-[#172b4d] font-sans selection:bg-blue-100 selection:text-blue-900">
+    <div className="landing-page min-h-screen bg-[var(--app-bg)] text-[var(--app-text)] font-sans selection:bg-blue-100 selection:text-blue-900">
       <LandingNavbar
         onOpenAuth={handleOpenAuth}
         onDemoLogin={handleDemoLogin}
