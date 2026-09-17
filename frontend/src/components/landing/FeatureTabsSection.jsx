@@ -90,7 +90,7 @@ export function FeatureTabsSection({ onEnterApp }) {
   const current = tabContents[activeTab];
 
   return (
-    <section id="features" className="py-20 bg-white border-b border-slate-200 text-[#172b4d]">
+    <section id="features" className="py-20 bg-[var(--landing-surface)] border-b border-slate-200 text-[var(--app-text)]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Section Headline */}

@@ -12,9 +12,13 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { useTheme } from '../../context/ThemeContext';
 
 export function WhiteboardCanvas() {
   const { currentOrg } = useApp();
+  const { theme } = useTheme();
+  const canvasBackground = theme === 'dark' ? '#1e293b' : '#ffffff';
+  const canvasStorageKey = `canvas_${theme === 'dark' ? 'dark' : 'light'}_${currentOrg.id}`;
   const canvasRef = useRef(null);
   const [tool, setTool] = useState('pen'); // 'pen' | 'rect' | 'diamond' | 'arrow' | 'text' | 'eraser'
   const [color, setColor] = useState('#0052cc'); // blue default
@@ -43,12 +47,12 @@ export function WhiteboardCanvas() {
     canvas.width = canvas.parentElement.clientWidth || 1000;
     canvas.height = 560;
 
-    // Crisp white background
-    ctx.fillStyle = '#ffffff';
+    // Match the current application theme while keeping exports readable.
+    ctx.fillStyle = canvasBackground;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 
     // Subtle blue grid lines
-    ctx.strokeStyle = 'rgba(0, 82, 204, 0.05)';
+    ctx.strokeStyle = theme === 'dark' ? 'rgba(147, 197, 253, 0.10)' : 'rgba(0, 82, 204, 0.05)';
     ctx.lineWidth = 1;
     for (let x = 0; x < canvas.width; x += 30) {
       ctx.beginPath();
@@ -63,7 +67,7 @@ export function WhiteboardCanvas() {
       ctx.stroke();
     }
 
-    const saved = localStorage.getItem(`canvas_light_${currentOrg.id}`);
+    const saved = localStorage.getItem(canvasStorageKey);
     if (saved) {
       const img = new Image();
       img.onload = () => ctx.drawImage(img, 0, 0);
@@ -71,20 +75,20 @@ export function WhiteboardCanvas() {
     } else {
       drawDefaultArchitecture(ctx);
     }
-  }, [currentOrg.id]);
+  }, [canvasBackground, canvasStorageKey, currentOrg.id, theme]);
 
   const drawDefaultArchitecture = (ctx) => {
     // 1. Client App (Box)
     ctx.strokeStyle = '#0052cc';
     ctx.lineWidth = 2.5;
-    ctx.fillStyle = '#eff6ff';
+    ctx.fillStyle = theme === 'dark' ? '#172b4d' : '#eff6ff';
     ctx.strokeRect(60, 220, 160, 80);
     ctx.fillRect(60, 220, 160, 80);
 
     ctx.fillStyle = '#0052cc';
     ctx.font = 'bold 13px sans-serif';
     ctx.fillText('React Client App', 85, 255);
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = theme === 'dark' ? '#cbd5e1' : '#64748b';
     ctx.font = '11px sans-serif';
     ctx.fillText('WebSocket :443', 95, 275);
 
@@ -103,7 +107,7 @@ export function WhiteboardCanvas() {
 
     // 2. Decision Diamond
     ctx.strokeStyle = '#f59e0b';
-    ctx.fillStyle = '#fffbeb';
+    ctx.fillStyle = theme === 'dark' ? '#3b2d13' : '#fffbeb';
     ctx.beginPath();
     ctx.moveTo(420, 200);
     ctx.lineTo(500, 260);
@@ -116,7 +120,7 @@ export function WhiteboardCanvas() {
     ctx.fillStyle = '#b45309';
     ctx.font = 'bold 12px sans-serif';
     ctx.fillText('Auth Gateway', 380, 255);
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = theme === 'dark' ? '#cbd5e1' : '#64748b';
     ctx.font = '10px sans-serif';
     ctx.fillText('JWT Verify', 390, 272);
 
@@ -135,19 +139,19 @@ export function WhiteboardCanvas() {
 
     // 3. Database / Cache (Box)
     ctx.strokeStyle = '#10b981';
-    ctx.fillStyle = '#f0fdf4';
+    ctx.fillStyle = theme === 'dark' ? '#153a32' : '#f0fdf4';
     ctx.strokeRect(620, 220, 180, 80);
     ctx.fillRect(620, 220, 180, 80);
 
     ctx.fillStyle = '#047857';
     ctx.font = 'bold 13px sans-serif';
     ctx.fillText('MongoDB & Redis', 655, 255);
-    ctx.fillStyle = '#64748b';
+    ctx.fillStyle = theme === 'dark' ? '#cbd5e1' : '#64748b';
     ctx.font = '11px sans-serif';
     ctx.fillText('Real-Time Broadcast', 655, 275);
 
     // Title label
-    ctx.fillStyle = '#172b4d';
+    ctx.fillStyle = theme === 'dark' ? '#e5edf8' : '#172b4d';
     ctx.font = 'bold 15px sans-serif';
     ctx.fillText('System Architecture & Data Flow Schematic', 60, 60);
   };
@@ -156,7 +160,7 @@ export function WhiteboardCanvas() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dataUrl = canvas.toDataURL();
-    localStorage.setItem(`canvas_light_${currentOrg.id}`, dataUrl);
+    localStorage.setItem(canvasStorageKey, dataUrl);
     setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
   };
 
@@ -197,7 +201,7 @@ export function WhiteboardCanvas() {
       ctx.lineTo(x, y);
       ctx.stroke();
     } else if (tool === 'eraser') {
-      ctx.strokeStyle = '#ffffff';
+      ctx.strokeStyle = canvasBackground;
       ctx.lineWidth = lineWidth * 6;
       ctx.lineCap = 'round';
       ctx.lineTo(x, y);
@@ -261,7 +265,7 @@ export function WhiteboardCanvas() {
   const handleClearCanvas = () => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = canvasBackground;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     autoSaveCanvas();
   };
