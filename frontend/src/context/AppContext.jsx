@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { MOCK_USERS, MOCK_BOARDS } from '../data/mockData';
+import { MOCK_USERS } from '../data/mockData';
 import {
   MOCK_ORGS,
   MOCK_TASKS,
@@ -25,8 +25,30 @@ export function AppProvider({ children }) {
     return currentUser ? 'personal' : 'landing';
   });
 
-  // Organizations / Teams
-  const [orgs, setOrgs] = useState(MOCK_ORGS);
+  // Organizations / Spaces
+  const [orgs, setOrgs] = useState(() => {
+    const saved = localStorage.getItem('sprintflow_spaces');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Ensure members array exists on all spaces (migration from older local state)
+        return parsed.map((space) => {
+          const defaultOrg = MOCK_ORGS.find((o) => o.id === space.id);
+          return {
+            ...space,
+            members: space.members || defaultOrg?.members || [
+              { userId: 'usr-1', role: 'admin' },
+              { userId: 'usr-root', role: 'admin' },
+            ],
+            ownerId: space.ownerId || defaultOrg?.ownerId || 'usr-1',
+          };
+        });
+      } catch {
+        return MOCK_ORGS;
+      }
+    }
+    return MOCK_ORGS;
+  });
   const [currentOrgId, setCurrentOrgId] = useState('org-1');
 
   // Active sub-tab inside team space: 'board' | 'roadmap' | 'canvas' | 'chat'
@@ -68,6 +90,10 @@ export function AppProvider({ children }) {
   }, [currentUser]);
 
   useEffect(() => {
+    localStorage.setItem('sprintflow_spaces', JSON.stringify(orgs));
+  }, [orgs]);
+
+  useEffect(() => {
     localStorage.setItem('sprintflow_light_tasks', JSON.stringify(tasks));
   }, [tasks]);
 
@@ -95,7 +121,147 @@ export function AppProvider({ children }) {
     setViewMode('landing');
   };
 
-  const currentOrg = orgs.find((o) => o.id === currentOrgId) || orgs[0];
+  // Spaces accessible to the current active user
+  const userSpaces = orgs.filter((space) => {
+    if (!currentUser) return true;
+    if (currentUser.id === 'usr-root') return true;
+    return space.members?.some((m) => m.userId === currentUser.id) || space.ownerId === currentUser.id;
+  });
+
+  // Ensure currentOrg is accessible or fall back to first user space
+  const rawCurrentOrg = orgs.find((o) => o.id === currentOrgId) || userSpaces[0] || orgs[0];
+  const userMemberRecord = rawCurrentOrg?.members?.find((m) => m.userId === (currentUser?.id || 'usr-1'));
+  const currentOrg = {
+    ...rawCurrentOrg,
+    role: userMemberRecord?.role || rawCurrentOrg?.role || 'member',
+    memberCount: rawCurrentOrg?.members?.length || rawCurrentOrg?.memberCount || 1,
+  };
+
+  // Users list (persisted to support dynamically added members via link/invite)
+  const [usersList, setUsersList] = useState(() => {
+    const saved = localStorage.getItem('sprintflow_all_users');
+    return saved ? JSON.parse(saved) : MOCK_USERS;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sprintflow_all_users', JSON.stringify(usersList));
+  }, [usersList]);
+
+  // Create a new Space
+  const createSpace = ({ name, description, color, invitedMemberIds = [], customInvites = [] }) => {
+    const activeUserId = currentUser?.id || 'usr-1';
+    const newSpaceId = `space-${Date.now()}`;
+    const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'space';
+    
+    // Process custom invites (email/name)
+    const newMembersFromCustom = [];
+    if (customInvites && customInvites.length > 0) {
+      customInvites.forEach((invite) => {
+        const emailOrName = typeof invite === 'string' ? invite.trim() : invite.email || invite.name;
+        if (!emailOrName) return;
+        const existing = usersList.find((u) => u.email?.toLowerCase() === emailOrName.toLowerCase() || u.name?.toLowerCase() === emailOrName.toLowerCase());
+        if (existing) {
+          newMembersFromCustom.push({ userId: existing.id, role: 'member' });
+        } else {
+          const newUserId = `usr-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          const displayName = emailOrName.includes('@') ? emailOrName.split('@')[0] : emailOrName;
+          const formattedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+          const newUser = {
+            id: newUserId,
+            name: formattedName,
+            email: emailOrName.includes('@') ? emailOrName : `${emailOrName.toLowerCase()}@team.io`,
+            role: 'member',
+            title: 'Guest Collaborator',
+            avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`,
+            color: '#6366f1',
+          };
+          setUsersList((prev) => [...prev, newUser]);
+          newMembersFromCustom.push({ userId: newUserId, role: 'member' });
+        }
+      });
+    }
+
+    const membersList = [
+      { userId: activeUserId, role: 'admin' },
+      ...(activeUserId !== 'usr-root' ? [{ userId: 'usr-root', role: 'admin' }] : []),
+      ...invitedMemberIds
+        .filter((id) => id !== activeUserId && id !== 'usr-root')
+        .map((userId) => ({ userId, role: 'member' })),
+      ...newMembersFromCustom,
+    ];
+
+    const newSpace = {
+      id: newSpaceId,
+      name: name.trim(),
+      slug,
+      description: description?.trim() || 'Collaborative team space',
+      color: color || '#0052cc',
+      ownerId: activeUserId,
+      role: 'admin',
+      memberCount: membersList.length,
+      activeTasks: 0,
+      members: membersList,
+      inviteLink: `${window.location.origin}/join/${slug}-${newSpaceId}`,
+    };
+
+    setOrgs((prev) => [...prev, newSpace]);
+    setCurrentOrgId(newSpaceId);
+    setViewMode('team');
+    setTeamTab('board');
+    setWorkspacePage('projects');
+
+    return newSpace;
+  };
+
+  // Invite Member to a Space (supports userId or email/custom person)
+  const inviteMemberToSpace = (spaceId, { userId, email, name, role = 'member' }) => {
+    let targetUserId = userId;
+
+    if (!targetUserId && (email || name)) {
+      const emailOrName = (email || name).trim();
+      const existing = usersList.find((u) => u.email?.toLowerCase() === emailOrName.toLowerCase() || u.name?.toLowerCase() === emailOrName.toLowerCase());
+      if (existing) {
+        targetUserId = existing.id;
+      } else {
+        targetUserId = `usr-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        const displayName = emailOrName.includes('@') ? emailOrName.split('@')[0] : emailOrName;
+        const formattedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+        const newUser = {
+          id: targetUserId,
+          name: formattedName,
+          email: emailOrName.includes('@') ? emailOrName : `${emailOrName.toLowerCase()}@team.io`,
+          role: 'member',
+          title: 'Guest Collaborator',
+          avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80`,
+          color: '#6366f1',
+        };
+        setUsersList((prev) => [...prev, newUser]);
+      }
+    }
+
+    if (!targetUserId) return;
+
+    setOrgs((prev) =>
+      prev.map((space) => {
+        if (space.id !== spaceId) return space;
+        const currentMembers = space.members || [];
+        const existingIndex = currentMembers.findIndex((m) => m.userId === targetUserId);
+        let updatedMembers;
+        if (existingIndex >= 0) {
+          updatedMembers = currentMembers.map((m, idx) =>
+            idx === existingIndex ? { ...m, role } : m
+          );
+        } else {
+          updatedMembers = [...currentMembers, { userId: targetUserId, role }];
+        }
+        return {
+          ...space,
+          members: updatedMembers,
+          memberCount: updatedMembers.length,
+        };
+      })
+    );
+  };
 
   // Personal tasks
   const personalTasks = tasks.filter(
@@ -103,12 +269,12 @@ export function AppProvider({ children }) {
   );
 
   // Org Tasks
-  const currentOrgTasks = tasks.filter((t) => t.orgId === currentOrgId);
+  const currentOrgTasks = tasks.filter((t) => t.orgId === currentOrg.id);
 
   // Add Task
   const addTask = (payload) => {
-    const targetOrgId = payload.orgId || currentOrgId;
-    const org = orgs.find((o) => o.id === targetOrgId);
+    const targetOrgId = payload.orgId || currentOrg.id;
+    const org = orgs.find((o) => o.id === targetOrgId) || currentOrg;
 
     const newTask = {
       id: `task-${Date.now()}`,
@@ -119,9 +285,9 @@ export function AppProvider({ children }) {
       status: payload.status || 'todo',
       priority: payload.priority || 'medium',
       type: payload.type || 'task',
-      assigneeId: currentUser?.id || 'usr-root',
+      assigneeId: payload.assigneeId || currentUser?.id || 'usr-root',
       dueDate: payload.dueDate || new Date().toISOString().split('T')[0],
-      order: tasks.filter((t) => t.orgId === targetOrgId).length,
+      order: tasks.filter((t) => t.orgId === targetOrgId && t.status === (payload.status || 'todo')).length,
       tags: payload.tags || ['Feature'],
     };
 
@@ -155,7 +321,7 @@ export function AppProvider({ children }) {
     if (!movingTask) return;
 
     const columnTasks = tasks
-      .filter((t) => t.orgId === currentOrgId && t.status === destStatus && t.id !== draggableId)
+      .filter((t) => t.orgId === currentOrg.id && t.status === destStatus && t.id !== draggableId)
       .sort((a, b) => a.order - b.order);
 
     columnTasks.splice(destination.index, 0, {
@@ -217,6 +383,20 @@ export function AppProvider({ children }) {
     );
   };
 
+  // Get active members for current space
+  const currentSpaceMembers = (currentOrg.members || []).map((m) => {
+    const user = usersList.find((u) => u.id === m.userId);
+    return {
+      id: m.userId,
+      name: user?.name || m.userId,
+      email: user?.email || '',
+      avatar: user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      role: m.role || 'member',
+      title: user?.title || 'Team Member',
+      color: user?.color || '#6366f1',
+    };
+  });
+
   return (
     <AppContext.Provider
       value={{
@@ -233,8 +413,13 @@ export function AppProvider({ children }) {
         starredOrgIds,
         toggleStarredOrg,
         orgs,
+        spaces: orgs,
+        userSpaces,
         currentOrg,
+        currentSpace: currentOrg,
         selectOrg,
+        createSpace,
+        inviteMemberToSpace,
         teamTab,
         setTeamTab,
         tasks: currentOrgTasks,
@@ -244,13 +429,14 @@ export function AppProvider({ children }) {
         updateTask,
         deleteTask,
         handleDragEnd,
-        roadmapItems: roadmapItems.filter((r) => r.orgId === currentOrgId),
-        channels: channels.filter((c) => c.orgId === currentOrgId || !c.orgId),
+        roadmapItems: roadmapItems.filter((r) => r.orgId === currentOrg.id),
+        channels: channels.filter((c) => c.orgId === currentOrg.id || !c.orgId),
         activeChannelId,
         setActiveChannelId,
         chatMessages: chatMessages.filter((m) => m.channelId === activeChannelId),
         sendChatMessage,
-        members: MOCK_USERS,
+        members: currentSpaceMembers.length > 0 ? currentSpaceMembers : usersList,
+        allUsers: usersList,
       }}
     >
       {children}

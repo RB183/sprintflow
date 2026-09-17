@@ -38,3 +38,23 @@ exports.createOrganization = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.inviteMember = async (req, res, next) => {
+  try {
+    const { orgId } = req.params;
+    const { userId, role = 'member' } = req.body;
+
+    // Check existing membership
+    let membership = await OrgMember.findOne({ orgId, userId });
+    if (membership) {
+      membership.role = role;
+      await membership.save();
+    } else {
+      membership = await OrgMember.create({ orgId, userId, role });
+    }
+
+    res.status(200).json({ success: true, membership });
+  } catch (err) {
+    next(err);
+  }
+};

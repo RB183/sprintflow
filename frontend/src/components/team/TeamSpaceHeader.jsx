@@ -1,18 +1,21 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Kanban,
   Map,
   Edit3,
   MessageSquare,
   Users,
+  UserPlus,
   Shield,
   Layers,
   Cpu,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
+import { InviteMemberModal } from './InviteMemberModal';
 
 export function TeamSpaceHeader() {
   const { currentOrg, teamTab, setTeamTab, members } = useApp();
+  const [isInviteOpen, setIsInviteOpen] = useState(false);
 
   const tabs = [
     { id: 'board', label: 'Kanban Board', icon: Kanban },
@@ -40,16 +43,27 @@ export function TeamSpaceHeader() {
           </p>
         </div>
 
-        {/* Member presence */}
-        <div className="flex items-center gap-3">
+        {/* Member presence & Invite button */}
+        <div className="flex items-center gap-2.5">
           <div className="flex items-center gap-2 text-xs text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-xs">
             <Users className="w-4 h-4 text-[#0052cc]" />
-            <span className="font-semibold">{currentOrg.memberCount} Members</span>
+            <span className="font-semibold">{members.length} {members.length === 1 ? 'Member' : 'Members'}</span>
             <span className="text-slate-300">|</span>
-            <span className="text-emerald-600 font-bold">● 4 Online</span>
+            <span className="text-emerald-600 font-bold">● Live</span>
           </div>
+
+          <button
+            type="button"
+            onClick={() => setIsInviteOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0052cc] text-xs font-bold border border-blue-200 transition-colors cursor-pointer shadow-xs"
+          >
+            <UserPlus className="w-3.5 h-3.5" />
+            <span>Invite</span>
+          </button>
         </div>
       </div>
+
+      <InviteMemberModal isOpen={isInviteOpen} onClose={() => setIsInviteOpen(false)} />
 
       {/* Sub-navigation Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">
