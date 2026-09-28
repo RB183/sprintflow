@@ -97,7 +97,13 @@ export function HackerKanbanBoard() {
                     >
                       {/* Inline quick add */}
                       {isAddingInColumn === column.id && (
-                        <div className="p-3 bg-white border border-[#0052cc] rounded-xl shadow-md space-y-2 animate-in zoom-in-95">
+                        <form
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            handleCreateCard(column.id);
+                          }}
+                          className="p-3 bg-white border border-[#0052cc] rounded-xl shadow-md space-y-2 animate-in zoom-in-95"
+                        >
                           <input
                             type="text"
                             value={newTitle}
@@ -105,9 +111,6 @@ export function HackerKanbanBoard() {
                             placeholder="What needs to be done?..."
                             autoFocus
                             className="w-full px-2.5 py-1.5 bg-slate-50 border border-slate-200 text-xs text-slate-900 focus:outline-none focus:border-[#0052cc] rounded-lg"
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') handleCreateCard(column.id);
-                            }}
                           />
                           <div className="flex items-center justify-between pt-1">
                             <select
@@ -123,20 +126,24 @@ export function HackerKanbanBoard() {
 
                             <div className="flex items-center gap-1">
                               <button
-                                onClick={() => handleCreateCard(column.id)}
-                                className="px-3 py-1 rounded-lg bg-[#0052cc] text-white text-xs font-bold"
+                                type="submit"
+                                className="px-3 py-1 rounded-lg bg-[#0052cc] hover:bg-[#0041a8] text-white text-xs font-bold transition-colors cursor-pointer"
                               >
                                 Add
                               </button>
                               <button
-                                onClick={() => setIsAddingInColumn(null)}
-                                className="p-1 text-slate-400 hover:text-slate-600"
+                                type="button"
+                                onClick={() => {
+                                  setIsAddingInColumn(null);
+                                  setNewTitle('');
+                                }}
+                                className="p-1 text-slate-400 hover:text-slate-600 cursor-pointer"
                               >
                                 <X className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
-                        </div>
+                        </form>
                       )}
 
                       {/* Render Draggable Cards */}

@@ -14,11 +14,12 @@ import {
 import { useApp } from '../../context/AppContext';
 
 export function PersonalWorkspace() {
-  const { personalTasks, addTask, updateTask, orgs, selectOrg, setTeamTab, currentUser } = useApp();
+  const { personalTasks, addTask, updateTask, orgs, userSpaces, selectOrg, setTeamTab, currentUser } = useApp();
+  const availableSpaces = userSpaces?.length > 0 ? userSpaces : orgs;
   const [filterStatus, setFilterStatus] = useState('all');
   const [quickTitle, setQuickTitle] = useState('');
   const [quickPriority, setQuickPriority] = useState('medium');
-  const [quickOrgId, setQuickOrgId] = useState(orgs[0]?.id || 'org-1');
+  const [quickOrgId, setQuickOrgId] = useState(availableSpaces[0]?.id || 'org-1');
 
   const filteredTasks = personalTasks.filter((task) => {
     if (filterStatus === 'all') return true;
@@ -125,8 +126,8 @@ export function PersonalWorkspace() {
           </div>
 
           <div className="p-4 bg-white border border-slate-200 rounded-xl shadow-xs">
-            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Connected Teams</p>
-            <p className="text-2xl font-black text-[#172b4d] mt-1">{orgs.length}</p>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">Connected Spaces</p>
+            <p className="text-2xl font-black text-[#172b4d] mt-1">{availableSpaces.length}</p>
             <p className="text-xs text-slate-500 mt-0.5">Unlimited 100% free</p>
           </div>
         </div>
@@ -164,9 +165,9 @@ export function PersonalWorkspace() {
             onChange={(e) => setQuickOrgId(e.target.value)}
             className="w-full sm:w-auto px-3 py-2.5 bg-slate-50 border border-slate-200 text-xs font-semibold text-slate-700 rounded-xl focus:outline-none focus:border-[#0052cc]"
           >
-            {orgs.map((o) => (
+            {availableSpaces.map((o) => (
               <option key={o.id} value={o.id}>
-                Team: {o.name}
+                Space: {o.name}
               </option>
             ))}
           </select>

@@ -10,13 +10,14 @@ const issueTypes = [
 ];
 
 export function CreateIssueDialog({ isOpen, onClose, initialType = 'task' }) {
-  const { addTask, currentOrg, orgs } = useApp();
+  const { addTask, currentOrg, userSpaces, orgs } = useApp();
+  const availableSpaces = userSpaces?.length > 0 ? userSpaces : orgs;
   const titleRef = useRef(null);
   const [type, setType] = useState(initialType);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
-  const [orgId, setOrgId] = useState(currentOrg?.id || 'org-1');
+  const [orgId, setOrgId] = useState(currentOrg?.id || availableSpaces[0]?.id || 'org-1');
 
   useEffect(() => {
     if (!isOpen) return undefined;
@@ -70,8 +71,8 @@ export function CreateIssueDialog({ isOpen, onClose, initialType = 'task' }) {
             <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows="3" placeholder="Add helpful context..." className="mt-1.5 w-full resize-y rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0052cc] focus:bg-white focus:outline-none" />
           </label>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <label className="text-xs font-bold text-slate-700">Project
-              <select value={orgId} onChange={(event) => setOrgId(event.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-[#0052cc] focus:outline-none">{orgs.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}</select>
+            <label className="text-xs font-bold text-slate-700">Space / Project
+              <select value={orgId} onChange={(event) => setOrgId(event.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-[#0052cc] focus:outline-none">{availableSpaces.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}</select>
             </label>
             <label className="text-xs font-bold text-slate-700">Priority
               <select value={priority} onChange={(event) => setPriority(event.target.value)} className="mt-1.5 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs font-semibold text-slate-700 focus:border-[#0052cc] focus:outline-none"><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option><option value="urgent">Urgent</option></select>

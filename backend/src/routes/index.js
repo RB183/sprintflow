@@ -23,6 +23,7 @@ router.get('/users/me/tasks', userController.getPersonalTasks);
 // Organizations
 router.get('/orgs', orgController.getUserOrganizations);
 router.post('/orgs', orgController.createOrganization);
+router.post('/orgs/:orgId/members', orgController.inviteMember);
 
 // Cards / Kanban
 router.post('/cards', cardController.createCard);
