@@ -9,14 +9,14 @@ import { useApp } from '../../context/AppContext';
 import { MOCK_USERS } from '../../data/mockData';
 
 export function LandingPage() {
-  const { login, setIsAuthModalOpen } = useApp();
+  const { login, demoLogin, setIsAuthModalOpen } = useApp();
 
-  const handleOpenAuth = (mode = 'signup', email = '') => {
+  const handleOpenAuth = () => {
     setIsAuthModalOpen(true);
   };
 
   const handleDemoLogin = () => {
-    login(MOCK_USERS[0]); // Alex Chen
+    demoLogin(MOCK_USERS[0]); // Alex Chen
   };
 
   const handleGoogleLogin = () => {
@@ -47,7 +47,9 @@ export function LandingPage() {
       <div id="workflow">
         <WorkflowShowcase onEnterApp={handleDemoLogin} />
       </div>
-      <CtaBanner onEnterApp={handleDemoLogin} />
+      <div id="get-started">
+        <CtaBanner onEnterApp={handleDemoLogin} />
+      </div>
       <LandingFooter />
     </div>
   );

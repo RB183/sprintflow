@@ -1,45 +1,44 @@
 import React, { useState } from 'react';
-import { X, Sparkles, User, Mail, Lock, ArrowRight, ShieldCheck, Zap } from 'lucide-react';
+import { X, Sparkles, User, Mail, Lock, ArrowRight, Zap } from 'lucide-react';
 import { MOCK_USERS } from '../../data/mockData';
+import { api } from '../../services/api';
 
-export function AuthModal({ isOpen, onClose, onLoginSuccess }) {
+export function AuthModal({ isOpen, onClose, onLoginSuccess, onDemoLogin }) {
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
-  const handleDemoLogin = (user) => {
-    onLoginSuccess(user || MOCK_USERS[0]);
+  const handleDemoLogin = async (user) => {
+    if (onDemoLogin) await onDemoLogin(user || MOCK_USERS[0]);
+    else onLoginSuccess(user || MOCK_USERS[0]);
     onClose();
   };
 
   const handleGoogleLogin = () => {
-    onLoginSuccess({
-      id: 'usr-google',
-      name: 'Google User',
-      email: 'user@gmail.com',
-      avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-      role: 'admin',
-      title: 'Senior Engineer',
-    });
-    onClose();
+    setError('Google sign-in is not configured yet. Use email and password for now.');
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!email) return;
+    setError('');
+    setIsSubmitting(true);
 
-    onLoginSuccess({
-      id: `usr-${Date.now()}`,
-      name: name || email.split('@')[0],
-      email: email,
-      avatar: MOCK_USERS[0].avatar,
-      role: 'admin',
-      title: 'Team Lead',
-    });
-    onClose();
+    try {
+      const result = mode === 'signup'
+        ? await api.register({ name, email, password })
+        : await api.login({ email, password });
+      onLoginSuccess(result.user, result.token);
+      onClose();
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -211,6 +210,7 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }) {
               <input
                 type="password"
                 required
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
@@ -219,11 +219,14 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess }) {
             </div>
           </div>
 
+          {error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{error}</p>}
+
           <button
             type="submit"
+            disabled={isSubmitting}
             className="w-full py-2.5 px-4 rounded-xl bg-[#0052cc] hover:bg-[#0041a8] text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
           >
-            <span>{mode === 'signin' ? 'Sign In to Workspace' : 'Create Free Account'}</span>
+            <span>{isSubmitting ? 'Working...' : mode === 'signin' ? 'Sign In to Workspace' : 'Create Free Account'}</span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </form>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Kanban, ArrowRight, Zap, Sparkles, Moon, Sun } from 'lucide-react';
+import { Kanban, ArrowRight, Zap, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
 export function LandingNavbar({ onOpenAuth, onDemoLogin }) {
@@ -28,8 +28,7 @@ export function LandingNavbar({ onOpenAuth, onDemoLogin }) {
           <div className="hidden md:flex items-center gap-6 text-sm font-semibold text-[#44546f]">
             <a href="#features" className="hover:text-[#0052cc] transition-colors">Features</a>
             <a href="#workflow" className="hover:text-[#0052cc] transition-colors">Workflows</a>
-            <a href="#templates" className="hover:text-[#0052cc] transition-colors">Templates</a>
-            <a href="#community" className="hover:text-[#0052cc] transition-colors">Community</a>
+            <a href="#get-started" className="hover:text-[#0052cc] transition-colors">Get started</a>
           </div>
         </div>
 

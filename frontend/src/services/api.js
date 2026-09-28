@@ -20,6 +20,53 @@ class ApiService {
     }
   }
 
+  getToken() {
+    return this.token;
+  }
+
+  async authRequest(endpoint, options = {}) {
+    const response = await fetch(`${API_BASE}${endpoint}`, {
+      ...options,
+      credentials: 'include',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(this.token && { Authorization: `Bearer ${this.token}` }),
+        ...options.headers,
+      },
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      throw new Error(data.message || 'Authentication request failed');
+    }
+    return data;
+  }
+
+  register(credentials) {
+    return this.authRequest('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+  }
+
+  login(credentials) {
+    return this.authRequest('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(credentials),
+    });
+  }
+
+  demoLogin() {
+    return this.authRequest('/auth/demo', { method: 'POST' });
+  }
+
+  getCurrentUser() {
+    return this.authRequest('/auth/me');
+  }
+
+  logout() {
+    return this.authRequest('/auth/logout', { method: 'POST' });
+  }
+
   async request(endpoint, options = {}) {
     const headers = {
       'Content-Type': 'application/json',
@@ -30,6 +77,7 @@ class ApiService {
     try {
       const response = await fetch(`${API_BASE}${endpoint}`, {
         ...options,
+        credentials: 'include',
         headers,
       });
 

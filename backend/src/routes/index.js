@@ -13,6 +13,8 @@ const chatController = require('../controllers/chat.controller');
 router.post('/auth/register', authController.register);
 router.post('/auth/login', authController.login);
 router.post('/auth/demo', authController.demoLogin);
+router.post('/auth/logout', authController.logout);
+router.get('/auth/me', authMiddleware, authController.me);
 
 // Protected routes
 router.use(authMiddleware);

@@ -23,6 +23,7 @@ function MainApp() {
     isAuthModalOpen,
     setIsAuthModalOpen,
     login,
+    demoLogin,
   } = useApp();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
@@ -34,6 +35,7 @@ function MainApp() {
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
           onLoginSuccess={login}
+          onDemoLogin={demoLogin}
         />
       </>
     );
@@ -68,6 +70,7 @@ function MainApp() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onLoginSuccess={login}
+        onDemoLogin={demoLogin}
       />
     </div>
   );

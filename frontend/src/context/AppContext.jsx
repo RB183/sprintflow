@@ -7,16 +7,26 @@ import {
   MOCK_CHAT_CHANNELS,
   MOCK_CHAT_MESSAGES,
 } from '../data/hackerMockData';
+import { api } from '../services/api';
 import confetti from 'canvas-confetti';
 
 const AppContext = createContext(null);
+
+const createEntityId = (prefix) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+const createRandomNumber = (max) => Math.floor(Math.random() * max);
 
 export function AppProvider({ children }) {
   // Authentication State
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('sprintflow_auth_user');
-    return saved ? JSON.parse(saved) : null; // null means guest on landing page
+    if (!saved) return null;
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return null;
+    }
   });
+  const [isAuthLoading, setIsAuthLoading] = useState(Boolean(api.getToken() || localStorage.getItem('sprintflow_auth_user')));
 
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
 
@@ -70,7 +80,7 @@ export function AppProvider({ children }) {
   });
 
   // Roadmap Items
-  const [roadmapItems, setRoadmapItems] = useState(MOCK_ROADMAP);
+  const roadmapItems = MOCK_ROADMAP;
 
   // Chat
   const [channels] = useState(MOCK_CHAT_CHANNELS);
@@ -88,6 +98,30 @@ export function AppProvider({ children }) {
       localStorage.removeItem('sprintflow_auth_user');
     }
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!api.getToken() && !localStorage.getItem('sprintflow_auth_user')) {
+      setIsAuthLoading(false);
+      return undefined;
+    }
+
+    let active = true;
+    api.getCurrentUser()
+      .then(({ user }) => {
+        if (active) setCurrentUser(user);
+      })
+      .catch(() => {
+        api.setToken(null);
+        if (active) setCurrentUser(null);
+      })
+      .finally(() => {
+        if (active) setIsAuthLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem('sprintflow_spaces', JSON.stringify(orgs));
@@ -109,14 +143,26 @@ export function AppProvider({ children }) {
     localStorage.setItem('sprintflow_starred_orgs', JSON.stringify(starredOrgIds));
   }, [starredOrgIds]);
 
-  const login = (user) => {
-    const activeUser = user || MOCK_USERS[0];
-    setCurrentUser(activeUser);
+  const login = (user, token) => {
+    if (token) api.setToken(token);
+    else api.setToken(null);
+    setCurrentUser(user || MOCK_USERS[0]);
     setViewMode('personal');
     setIsAuthModalOpen(false);
   };
 
+  const demoLogin = async (fallbackUser = MOCK_USERS[0]) => {
+    try {
+      const result = await api.demoLogin();
+      login(result.user, result.token);
+    } catch {
+      login(fallbackUser);
+    }
+  };
+
   const logout = () => {
+    api.logout().catch(() => {});
+    api.setToken(null);
     setCurrentUser(null);
     setViewMode('landing');
   };
@@ -150,7 +196,7 @@ export function AppProvider({ children }) {
   // Create a new Space
   const createSpace = ({ name, description, color, invitedMemberIds = [], customInvites = [] }) => {
     const activeUserId = currentUser?.id || 'usr-1';
-    const newSpaceId = `space-${Date.now()}`;
+    const newSpaceId = createEntityId('space');
     const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'space';
 
     // Process custom invites (email/name)
@@ -163,7 +209,7 @@ export function AppProvider({ children }) {
         if (existing) {
           newMembersFromCustom.push({ userId: existing.id, role: 'member' });
         } else {
-          const newUserId = `usr-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+          const newUserId = createEntityId('usr');
           const displayName = emailOrName.includes('@') ? emailOrName.split('@')[0] : emailOrName;
           const formattedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
           const newUser = {
@@ -223,7 +269,7 @@ export function AppProvider({ children }) {
       if (existing) {
         targetUserId = existing.id;
       } else {
-        targetUserId = `usr-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        targetUserId = createEntityId('usr');
         const displayName = emailOrName.includes('@') ? emailOrName.split('@')[0] : emailOrName;
         const formattedName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
         const newUser = {
@@ -277,9 +323,9 @@ export function AppProvider({ children }) {
     const org = orgs.find((o) => o.id === targetOrgId) || currentOrg;
 
     const newTask = {
-      id: `task-${Date.now()}`,
+      id: createEntityId('task'),
       orgId: targetOrgId,
-      key: `${(org?.slug || 'TASK').substring(0, 3).toUpperCase()}-${Math.floor(10 + Math.random() * 90)}`,
+      key: `${(org?.slug || 'TASK').substring(0, 3).toUpperCase()}-${10 + createRandomNumber(80)}`,
       title: payload.title || 'Untitled Task',
       description: payload.description || '',
       status: payload.status || 'todo',
@@ -355,7 +401,7 @@ export function AppProvider({ children }) {
     const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
     const newMsg = {
-      id: `msg-${Date.now()}`,
+      id: createEntityId('msg'),
       channelId: activeChannelId,
       username: currentUser?.name || 'Guest User',
       role: currentOrg.role,
@@ -401,7 +447,9 @@ export function AppProvider({ children }) {
     <AppContext.Provider
       value={{
         currentUser,
+        isAuthLoading,
         login,
+        demoLogin,
         logout,
         isAuthModalOpen,
         setIsAuthModalOpen,
