@@ -3,14 +3,13 @@
 A high-performance, 100% free agile project management platform and collaborative whiteboard suite built with the MERN stack (MongoDB, Express.js, React, Node.js) and Socket.io.
 
 [![Live Demo](https://img.shields.io/badge/Vercel-Live%20Demo-black?style=for-the-badge&logo=vercel&logoColor=white)](https://sprintflow-two.vercel.app/)
-
+[![Backend API](https://img.shields.io/badge/Render-Backend%20Live-46e3b7?style=for-the-badge&logo=render&logoColor=black)](https://sprintflow-backend-knol.onrender.com/health)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 ---
 
 ## 🌐 Live Deployments
 
 - **🚀 Web Application (Frontend):** [https://sprintflow-two.vercel.app/](https://sprintflow-two.vercel.app/)
-- **⚡ API & WebSocket Engine (Backend):** [https://sprintflow-backend-knol.onrender.com](https://sprintflow-backend-knol.onrender.com)
-- **🩺 Health Check:** [https://sprintflow-backend-knol.onrender.com/health](https://sprintflow-backend-knol.onrender.com/health)
 
 ---
 
