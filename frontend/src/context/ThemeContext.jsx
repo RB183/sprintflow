@@ -5,8 +5,9 @@ const storageKey = 'sprintflow_theme';
 
 function getInitialTheme() {
   const savedTheme = localStorage.getItem(storageKey);
-  if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
-  return window.matchMedia?.('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  // Default strictly to 'light'; user must explicitly toggle to 'dark'
+  if (savedTheme === 'dark') return 'dark';
+  return 'light';
 }
 
 export function ThemeProvider({ children }) {
@@ -14,6 +15,11 @@ export function ThemeProvider({ children }) {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
     localStorage.setItem(storageKey, theme);
   }, [theme]);
 

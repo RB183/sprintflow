@@ -1,12 +1,12 @@
 import React from 'react';
-import { Kanban, ArrowRight, Zap, Moon, Sun } from 'lucide-react';
+import { Kanban, ArrowRight, Moon, Sun } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 
-export function LandingNavbar({ onOpenAuth, onDemoLogin }) {
+export function LandingNavbar({ onOpenAuth }) {
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <nav className="w-full bg-white border-b border-slate-200 sticky top-0 z-40">
+    <nav className="w-full bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-40 transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         {/* Brand Logo & Links */}
         <div className="flex items-center gap-8">
@@ -18,17 +18,17 @@ export function LandingNavbar({ onOpenAuth, onDemoLogin }) {
               <Kanban className="w-5 h-5" />
             </div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xl font-extrabold text-[#172b4d] tracking-tight">SprintFlow</span>
-              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300">
+              <span className="text-xl font-extrabold text-[#172b4d] dark:text-slate-100 tracking-tight">SprintFlow</span>
+              <span className="px-1.5 py-0.2 rounded text-[10px] font-bold uppercase tracking-wider bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-800">
                 100% Free
               </span>
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-6 text-sm font-semibold text-[#44546f]">
-            <a href="#features" className="hover:text-[#0052cc] transition-colors">Features</a>
-            <a href="#workflow" className="hover:text-[#0052cc] transition-colors">Workflows</a>
-            <a href="#get-started" className="hover:text-[#0052cc] transition-colors">Get started</a>
+          <div className="hidden md:flex items-center gap-6 text-sm font-semibold text-[#44546f] dark:text-slate-300">
+            <a href="#features" className="hover:text-[#0052cc] dark:hover:text-blue-400 transition-colors">Features</a>
+            <a href="#workflow" className="hover:text-[#0052cc] dark:hover:text-blue-400 transition-colors">Workflows</a>
+            <a href="#get-started" className="hover:text-[#0052cc] dark:hover:text-blue-400 transition-colors">Get started</a>
           </div>
         </div>
 
@@ -39,23 +39,14 @@ export function LandingNavbar({ onOpenAuth, onDemoLogin }) {
             onClick={toggleTheme}
             aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
             title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} mode`}
-            className="rounded-lg border border-slate-200 bg-slate-50 p-1.5 text-slate-600 transition-colors hover:bg-slate-100 hover:text-[#0052cc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052cc]"
+            className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 p-1.5 text-slate-600 dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700 hover:text-[#0052cc] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#0052cc] cursor-pointer"
           >
             {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-          {/* Instant 1-Click Demo */}
-          <button
-            onClick={onDemoLogin}
-            className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold transition-colors cursor-pointer shadow-sm"
-            title="Instant 1-Click Access Without Credentials"
-          >
-            <Zap className="w-3.5 h-3.5 fill-amber-500 text-amber-600" />
-            <span>⚡ Demo Sign In</span>
           </button>
 
           <button
             onClick={() => onOpenAuth('signin')}
-            className="text-sm font-semibold text-[#0052cc] hover:text-[#003da5] px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
+            className="text-sm font-semibold text-[#0052cc] dark:text-blue-400 hover:text-[#003da5] dark:hover:text-blue-300 px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
           >
             Sign in
           </button>

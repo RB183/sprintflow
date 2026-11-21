@@ -1,6 +1,9 @@
 module.exports = (io, socket) => {
+  socket.on('canvas:join_room', (orgId) => {
+    socket.join(`canvas:${orgId}`);
+  });
+
   socket.on('canvas:draw_stroke', (data) => {
-    // Broadcast stroke to everyone in the organization canvas room except sender
     socket.to(`canvas:${data.orgId}`).emit('canvas:remote_stroke', data);
   });
 
@@ -8,7 +11,7 @@ module.exports = (io, socket) => {
     socket.to(`canvas:${data.orgId}`).emit('canvas:remote_cursor', data);
   });
 
-  socket.on('canvas:join_room', (orgId) => {
-    socket.join(`canvas:${orgId}`);
+  socket.on('canvas:clear', (data) => {
+    socket.to(`canvas:${data.orgId}`).emit('canvas:remote_clear', data);
   });
 };

@@ -10,7 +10,7 @@ import {
   Zap,
 } from 'lucide-react';
 
-export function HeroSection({ onOpenAuth, onDemoLogin, onGoogleLogin }) {
+export function HeroSection({ onOpenAuth, onGoogleLogin }) {
   const [email, setEmail] = useState('');
 
   const handleSignupSubmit = (e) => {
@@ -66,7 +66,7 @@ export function HeroSection({ onOpenAuth, onDemoLogin, onGoogleLogin }) {
               </button>
             </form>
 
-            {/* SSO Options & Instant Demo Button */}
+            {/* SSO Options */}
             <div className="max-w-md pt-2 space-y-3">
               <div className="relative flex py-1 items-center">
                 <div className="flex-grow border-t border-blue-400/40"></div>
@@ -100,17 +100,16 @@ export function HeroSection({ onOpenAuth, onDemoLogin, onGoogleLogin }) {
                       d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
                     />
                   </svg>
-                  <span>Google</span>
+                  <span>Google SSO</span>
                 </button>
 
-                {/* 1-Click Instant Demo Button */}
                 <button
-                  onClick={onDemoLogin}
+                  onClick={() => onOpenAuth('signin')}
                   type="button"
-                  className="flex items-center justify-center gap-1.5 py-2.5 px-4 bg-emerald-500 hover:bg-emerald-400 text-white font-extrabold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
+                  className="flex items-center justify-center gap-1.5 py-2.5 px-4 bg-white/10 hover:bg-white/20 border border-white/30 text-white font-semibold text-xs rounded-lg shadow-sm transition-colors cursor-pointer"
                 >
-                  <Zap className="w-4 h-4 fill-white" />
-                  <span>1-Click Demo</span>
+                  <span>Email Sign In</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
                 </button>
               </div>
             </div>

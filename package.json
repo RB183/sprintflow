@@ -8,10 +8,12 @@
     "backend"
   ],
   "scripts": {
-    "dev": "npm run dev --prefix frontend",
+    "dev": "concurrently -n \"frontend,backend\" -c \"cyan,magenta\" \"npm run dev --prefix frontend\" \"npm run dev --prefix backend\"",
     "dev:frontend": "npm run dev --prefix frontend",
     "dev:backend": "npm run dev --prefix backend",
     "build": "npm run build --prefix frontend",
+    "start": "npm run start --prefix backend",
+    "seed": "node backend/src/scripts/seed.js",
     "install:all": "npm install --prefix frontend && npm install --prefix backend"
   },
   "keywords": [
@@ -25,5 +27,8 @@
     "whiteboard"
   ],
   "author": "SprintFlow Engineering",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^10.0.7"
+  }
 }

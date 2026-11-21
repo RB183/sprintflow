@@ -1,35 +1,30 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { MOCK_USERS } from '../data/mockData';
 
 const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
-  const [users] = useState(MOCK_USERS);
   const [currentUser, setCurrentUser] = useState(() => {
-    const saved = localStorage.getItem('sprintflow_user');
+    const saved = localStorage.getItem('sprintflow_auth_user');
     if (saved) {
       try {
         return JSON.parse(saved);
       } catch (e) {
-        // fallback
+        return null;
       }
     }
-    return MOCK_USERS[0]; // Alex Chen (Lead Architect / Admin)
+    return null;
   });
 
   useEffect(() => {
-    localStorage.setItem('sprintflow_user', JSON.stringify(currentUser));
+    if (currentUser) {
+      localStorage.setItem('sprintflow_auth_user', JSON.stringify(currentUser));
+    } else {
+      localStorage.removeItem('sprintflow_auth_user');
+    }
   }, [currentUser]);
 
-  const switchUser = (userId) => {
-    const found = users.find((u) => u.id === userId);
-    if (found) {
-      setCurrentUser(found);
-    }
-  };
-
   return (
-    <AuthContext.Provider value={{ currentUser, users, switchUser }}>
+    <AuthContext.Provider value={{ currentUser, setCurrentUser }}>
       {children}
     </AuthContext.Provider>
   );

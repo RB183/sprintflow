@@ -14,10 +14,21 @@ const startServer = async () => {
   // Initialize WebSockets
   initSockets(server);
 
-  // Listen
-  server.listen(PORT, () => {
-    console.log(`[SprintFlow API] Server running on http://localhost:${PORT}`);
+  // Listen on 0.0.0.0 for seamless container/cloud hosting (Render, Railway, Docker)
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(`[SprintFlow API] Server running on port ${PORT}`);
   });
+
+  const handleShutdown = (signal) => {
+    console.log(`[SprintFlow] Received ${signal}. Gracefully shutting down...`);
+    server.close(() => {
+      console.log('[SprintFlow] HTTP server closed.');
+      process.exit(0);
+    });
+  };
+
+  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+  process.on('SIGINT', () => handleShutdown('SIGINT'));
 };
 
 startServer();

@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Droppable } from '@hello-pangea/dnd';
 import { Plus, MoreHorizontal, Trash2, Edit2, X, Check } from 'lucide-react';
 import { KanbanCard } from './KanbanCard';
 import { useBoard } from '../../context/BoardContext';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 
 export function KanbanColumn({ list, cards }) {
   const { setCreateListId, setIsCreateModalOpen, addCard, deleteList, updateList } = useBoard();
@@ -11,6 +12,27 @@ export function KanbanColumn({ list, cards }) {
   const [isQuickAdding, setIsQuickAdding] = useState(false);
   const [quickTitle, setQuickTitle] = useState('');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const menuRef = useRef(null);
+
+  useEffect(() => {
+    if (!isMenuOpen) return;
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setIsMenuOpen(false);
+      }
+    };
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setIsMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isMenuOpen]);
 
   const handleSaveTitle = () => {
     if (newTitle.trim()) {
@@ -91,7 +113,7 @@ export function KanbanColumn({ list, cards }) {
             <Plus className="w-4 h-4" />
           </button>
 
-          <div className="relative">
+          <div ref={menuRef} className="relative">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               className="p-1 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-md transition-colors"
@@ -112,11 +134,12 @@ export function KanbanColumn({ list, cards }) {
                   <span>Rename List</span>
                 </button>
                 <button
+                  type="button"
                   onClick={() => {
-                    deleteList(list.id);
+                    setIsDeleteDialogOpen(true);
                     setIsMenuOpen(false);
                   }}
-                  className="w-full text-left px-2.5 py-1.5 rounded text-xs font-medium text-rose-400 hover:bg-rose-500/10 flex items-center gap-2"
+                  className="w-full text-left px-2.5 py-1.5 rounded text-xs font-medium text-rose-400 hover:bg-rose-500/10 flex items-center gap-2 cursor-pointer"
                 >
                   <Trash2 className="w-3 h-3" />
                   <span>Delete List</span>
@@ -187,6 +210,17 @@ export function KanbanColumn({ list, cards }) {
           </div>
         )}
       </Droppable>
+
+      <ConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={() => deleteList(list.id)}
+        title="Delete Column List"
+        description={`Are you sure you want to delete "${list.title}" and all its cards? This action cannot be undone.`}
+        confirmText="Delete List"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 }

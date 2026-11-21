@@ -6,13 +6,25 @@ import {
   MessageSquare,
   Users,
   UserPlus,
+  BarChart3,
+  Trash2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { InviteMemberModal } from './InviteMemberModal';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 
 export function TeamSpaceHeader() {
-  const { currentOrg, teamTab, setTeamTab, members } = useApp();
+  const { currentOrg, teamTab, setTeamTab, members, setIsMetricsOpen, currentUser, deleteSpace } = useApp();
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const isOwner = Boolean(
+    currentUser?.id &&
+    (currentOrg?.ownerId === currentUser.id ||
+      currentOrg?.ownerId?._id === currentUser.id ||
+      currentOrg?.ownerId?.toString() === currentUser.id.toString())
+  );
+  const isAdmin = currentOrg?.role === 'admin' || isOwner;
 
   const tabs = [
     { id: 'board', label: 'Kanban Board', icon: Kanban },
@@ -51,16 +63,49 @@ export function TeamSpaceHeader() {
 
           <button
             type="button"
+            onClick={() => setIsMetricsOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 transition-colors cursor-pointer shadow-xs"
+            title="View Sprint Telemetry & Insights"
+          >
+            <BarChart3 className="w-3.5 h-3.5 text-[#0052cc]" />
+            <span>Analytics</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsInviteOpen(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0052cc] text-xs font-bold border border-blue-200 transition-colors cursor-pointer shadow-xs"
           >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Invite</span>
           </button>
+
+          {isAdmin && (
+            <button
+              type="button"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-600 dark:text-rose-400 text-xs font-bold border border-rose-200 dark:border-rose-800 transition-colors cursor-pointer shadow-xs"
+              title="Delete this space (Admin only)"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Delete Space</span>
+            </button>
+          )}
         </div>
       </div>
 
       <InviteMemberModal isOpen={isInviteOpen} onClose={() => setIsInviteOpen(false)} />
+
+      <ConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={() => deleteSpace(currentOrg?.id || currentOrg?._id)}
+        title={`Delete "${currentOrg?.name}"?`}
+        description="Are you sure you want to delete this space? All associated boards, cards, plans, and chat channels will be permanently erased. This action cannot be undone."
+        confirmText="Delete Space"
+        cancelText="Cancel"
+        variant="danger"
+      />
 
       {/* Sub-navigation Tabs */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1">

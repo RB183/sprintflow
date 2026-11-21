@@ -1,9 +1,14 @@
 import React, { lazy, Suspense, useState } from 'react';
 import { AppProvider, useApp } from './context/AppContext';
 import { ThemeProvider } from './context/ThemeContext';
+import { ToastProvider } from './context/ToastContext';
 import { LandingPage } from './components/landing/LandingPage';
 import { AppNavbar } from './components/layout/AppNavbar';
 import { AuthModal } from './components/auth/AuthModal';
+import { ProfileModal } from './components/common/ProfileModal';
+import { CommandPaletteModal } from './components/common/CommandPaletteModal';
+import { BoardMetricsModal } from './components/analytics/BoardMetricsModal';
+import { ActivityToastContainer } from './components/common/ActivityToast';
 import { SidebarNavigation } from './components/layout/SidebarNavigation';
 import { PageSkeleton } from './components/common/PageSkeleton';
 
@@ -17,17 +22,22 @@ const WorkspacePage = lazy(() => import('./components/layout/WorkspacePage').the
 
 function MainApp() {
   const {
+    currentUser,
     viewMode,
     teamTab,
     workspacePage,
     isAuthModalOpen,
     setIsAuthModalOpen,
+    isProfileModalOpen,
+    setIsProfileModalOpen,
     login,
-    demoLogin,
   } = useApp();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  if (viewMode === 'landing') {
+  // STRICT AUTHENTICATION GUARD:
+  // If user is not logged in or in landing mode, render ONLY LandingPage & AuthModal.
+  // Private workspaces, boards, chats, and canvases cannot be bypassed or accessed.
+  if (!currentUser || viewMode === 'landing') {
     return (
       <>
         <LandingPage />
@@ -35,7 +45,6 @@ function MainApp() {
           isOpen={isAuthModalOpen}
           onClose={() => setIsAuthModalOpen(false)}
           onLoginSuccess={login}
-          onDemoLogin={demoLogin}
         />
       </>
     );
@@ -70,8 +79,16 @@ function MainApp() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onLoginSuccess={login}
-        onDemoLogin={demoLogin}
       />
+
+      <ProfileModal
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+      />
+
+      <CommandPaletteModal />
+      <BoardMetricsModal />
+      <ActivityToastContainer />
     </div>
   );
 }
@@ -79,9 +96,11 @@ function MainApp() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AppProvider>
-        <MainApp />
-      </AppProvider>
+      <ToastProvider>
+        <AppProvider>
+          <MainApp />
+        </AppProvider>
+      </ToastProvider>
     </ThemeProvider>
   );
 }

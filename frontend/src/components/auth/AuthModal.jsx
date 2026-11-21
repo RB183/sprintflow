@@ -1,9 +1,30 @@
 import React, { useState } from 'react';
-import { X, Sparkles, User, Mail, Lock, ArrowRight, Zap } from 'lucide-react';
-import { MOCK_USERS } from '../../data/mockData';
+import { X, Sparkles, User, Mail, Lock, ArrowRight } from 'lucide-react';
+import {
+  createUserWithEmailAndPassword,
+  GoogleAuthProvider,
+  signInWithEmailAndPassword,
+  signInWithPopup,
+  updateProfile,
+} from 'firebase/auth';
+import { firebaseAuth } from '../../config/firebase';
 import { api } from '../../services/api';
 
-export function AuthModal({ isOpen, onClose, onLoginSuccess, onDemoLogin }) {
+const firebaseErrorMessage = (error) => {
+  const messages = {
+    'auth/email-already-in-use': 'An account already exists for this email.',
+    'auth/invalid-credential': 'Invalid email or password.',
+    'auth/popup-closed-by-user': 'Google sign-in was cancelled.',
+    'auth/popup-blocked': 'Sign-in popup was blocked by your browser. Please allow popups for this site.',
+    'auth/unauthorized-domain': 'This domain is not authorized in Firebase Console.',
+    'auth/operation-not-allowed': 'Google Sign-in is not enabled in Firebase Console.',
+    'auth/network-request-failed': 'Network connection failed. Please check your internet connection.',
+    'auth/weak-password': 'Password must be at least 6 characters.',
+  };
+  return messages[error.code] || error.message || 'Authentication failed';
+};
+
+export function AuthModal({ isOpen, onClose, onLoginSuccess }) {
   const [mode, setMode] = useState('signin'); // 'signin' | 'signup'
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -13,14 +34,39 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, onDemoLogin }) {
 
   if (!isOpen) return null;
 
-  const handleDemoLogin = async (user) => {
-    if (onDemoLogin) await onDemoLogin(user || MOCK_USERS[0]);
-    else onLoginSuccess(user || MOCK_USERS[0]);
-    onClose();
-  };
+  const handleGoogleLogin = async () => {
+    setError('');
+    setIsSubmitting(true);
+    try {
+      if (!firebaseAuth) {
+        throw new Error('Google Sign-in is not initialized. Please sign in with email and password.');
+      }
+      const result = await signInWithPopup(firebaseAuth, new GoogleAuthProvider());
+      let sessionUser = {
+        id: result.user.uid,
+        name: result.user.displayName || result.user.email?.split('@')[0] || 'User',
+        email: result.user.email,
+        avatar: result.user.photoURL,
+      };
 
-  const handleGoogleLogin = () => {
-    setError('Google sign-in is not configured yet. Use email and password for now.');
+      try {
+        const idToken = await result.user.getIdToken();
+        const session = await api.firebaseLogin(idToken);
+        if (session?.user) {
+          sessionUser = session.user;
+          if (session.token) api.setToken(session.token);
+        }
+      } catch (backendError) {
+        console.warn('Backend server session sync note:', backendError.message);
+      }
+
+      onLoginSuccess(sessionUser);
+      onClose();
+    } catch (requestError) {
+      setError(firebaseErrorMessage(requestError));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -29,13 +75,76 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, onDemoLogin }) {
     setIsSubmitting(true);
 
     try {
-      const result = mode === 'signup'
-        ? await api.register({ name, email, password })
-        : await api.login({ email, password });
-      onLoginSuccess(result.user, result.token);
-      onClose();
-    } catch (requestError) {
-      setError(requestError.message);
+      // First attempt native API authentication with database
+      if (mode === 'signup') {
+        try {
+          const res = await api.register({
+            name: name.trim(),
+            email: email.trim().toLowerCase(),
+            password,
+          });
+
+          if (res?.user) {
+            if (res.token) api.setToken(res.token);
+            onLoginSuccess(res.user, res.token);
+            onClose();
+            return;
+          }
+        } catch (apiErr) {
+          // If native register reported error (e.g. duplicate email), surface it
+          if (apiErr.message && !apiErr.message.includes('fetch')) {
+            throw apiErr;
+          }
+        }
+
+        // Optional Firebase fallback if native API is offline
+        if (firebaseAuth) {
+          const cred = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+          await updateProfile(cred.user, { displayName: name.trim() });
+          const user = {
+            id: cred.user.uid,
+            name: name.trim() || cred.user.email.split('@')[0],
+            email: cred.user.email,
+          };
+          onLoginSuccess(user);
+          onClose();
+          return;
+        }
+      } else {
+        // Sign-in
+        try {
+          const res = await api.login({
+            email: email.trim().toLowerCase(),
+            password,
+          });
+
+          if (res?.user) {
+            if (res.token) api.setToken(res.token);
+            onLoginSuccess(res.user, res.token);
+            onClose();
+            return;
+          }
+        } catch (apiErr) {
+          if (apiErr.message && !apiErr.message.includes('fetch')) {
+            throw apiErr;
+          }
+        }
+
+        // Optional Firebase fallback if native API is offline
+        if (firebaseAuth) {
+          const cred = await signInWithEmailAndPassword(firebaseAuth, email, password);
+          const user = {
+            id: cred.user.uid,
+            name: cred.user.displayName || cred.user.email.split('@')[0],
+            email: cred.user.email,
+          };
+          onLoginSuccess(user);
+          onClose();
+          return;
+        }
+      }
+    } catch (err) {
+      setError(firebaseErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -50,87 +159,39 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, onDemoLogin }) {
       />
 
       {/* Modal Card */}
-      <div className="relative w-full max-w-md bg-white rounded-2xl p-6 sm:p-8 shadow-2xl border border-slate-200 z-10 my-8 animate-in zoom-in-95 duration-150 text-[#172b4d]">
+      <div className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-2xl p-6 sm:p-8 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 my-8 animate-in zoom-in-95 duration-150 text-[#172b4d] dark:text-slate-100">
         
         {/* Header with Close */}
-        <div className="flex items-start justify-between pb-4 border-b border-slate-100">
+        <div className="flex items-start justify-between pb-4 border-b border-slate-100 dark:border-slate-800">
           <div>
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#0052cc] uppercase tracking-wider mb-1">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#0052cc] dark:text-blue-400 uppercase tracking-wider mb-1">
               <Sparkles className="w-3.5 h-3.5" />
-              <span>SprintFlow 100% Free Access</span>
+              <span>SprintFlow Enterprise</span>
             </div>
-            <h3 className="text-2xl font-extrabold text-[#172b4d]">
-              {mode === 'signin' ? 'Welcome back' : 'Create free account'}
+            <h3 className="text-2xl font-extrabold text-[#172b4d] dark:text-slate-100">
+              {mode === 'signin' ? 'Welcome back' : 'Create account'}
             </h3>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
               {mode === 'signin'
                 ? 'Sign in to access your boards and workspaces'
-                : 'No credit card needed. Instant setup.'}
+                : 'Get started with collaborative sprint planning.'}
             </p>
           </div>
 
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* 1-Click Instant Demo Login Banner */}
-        <div className="mt-5 p-3.5 bg-blue-50 border border-blue-200 rounded-xl space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#0052cc] flex items-center gap-1.5">
-              <Zap className="w-4 h-4 fill-[#0052cc]" />
-              <span>1-Click Instant Demo Access</span>
-            </span>
-            <span className="text-[10px] uppercase font-bold px-1.5 py-0.2 bg-[#0052cc] text-white rounded">
-              FASTEST
-            </span>
-          </div>
-          <p className="text-[11px] text-slate-600 leading-tight">
-            Jump directly into the live workspace without passwords:
-          </p>
-
-          <div className="grid grid-cols-2 gap-2 pt-1">
-            <button
-              type="button"
-              onClick={() => handleDemoLogin(MOCK_USERS[0])}
-              className="px-2.5 py-2 rounded-lg bg-white border border-blue-300 hover:border-[#0052cc] text-xs font-semibold text-[#172b4d] hover:bg-blue-50/50 shadow-sm transition-all flex items-center gap-2 cursor-pointer text-left"
-            >
-              <img
-                src={MOCK_USERS[0].avatar}
-                alt={MOCK_USERS[0].name}
-                className="w-5 h-5 rounded-full object-cover"
-              />
-              <div className="truncate">
-                <p className="truncate text-[11px] font-bold">Alex (Lead)</p>
-              </div>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => handleDemoLogin(MOCK_USERS[1])}
-              className="px-2.5 py-2 rounded-lg bg-white border border-blue-300 hover:border-[#0052cc] text-xs font-semibold text-[#172b4d] hover:bg-blue-50/50 shadow-sm transition-all flex items-center gap-2 cursor-pointer text-left"
-            >
-              <img
-                src={MOCK_USERS[1].avatar}
-                alt={MOCK_USERS[1].name}
-                className="w-5 h-5 rounded-full object-cover"
-              />
-              <div className="truncate">
-                <p className="truncate text-[11px] font-bold">Maya (Dev)</p>
-              </div>
-            </button>
-          </div>
-        </div>
-
-        {/* SSO Buttons (Google / Microsoft) */}
-        <div className="mt-4 space-y-2">
+        {/* SSO Buttons (Google) */}
+        <div className="mt-5 space-y-2">
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 bg-white border border-slate-300 hover:bg-slate-50 font-semibold text-xs text-slate-700 rounded-xl shadow-sm transition-colors cursor-pointer"
+            className="w-full flex items-center justify-center gap-3 py-2.5 px-4 bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 font-semibold text-xs text-slate-700 dark:text-slate-200 rounded-xl shadow-xs transition-colors cursor-pointer"
           >
             <svg className="w-4 h-4" viewBox="0 0 24 24">
               <path
@@ -156,18 +217,18 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, onDemoLogin }) {
 
         {/* Divider */}
         <div className="relative flex py-3 items-center">
-          <div className="flex-grow border-t border-slate-200"></div>
-          <span className="flex-shrink mx-3 text-xs text-slate-400 font-medium">
+          <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
+          <span className="flex-shrink mx-3 text-xs text-slate-400 dark:text-slate-500 font-medium">
             or with email
           </span>
-          <div className="flex-grow border-t border-slate-200"></div>
+          <div className="flex-grow border-t border-slate-200 dark:border-slate-800"></div>
         </div>
 
         {/* Email & Password Form */}
         <form onSubmit={handleSubmit} className="space-y-3">
           {mode === 'signup' && (
             <div>
-              <label className="text-xs font-bold text-slate-700 block mb-1">
+              <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
                 Full Name
               </label>
               <div className="relative">
@@ -178,14 +239,14 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, onDemoLogin }) {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Sarah Jenkins"
-                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc]"
+                  className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc]"
                 />
               </div>
             </div>
           )}
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
               Work Email
             </label>
             <div className="relative">
@@ -196,13 +257,13 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, onDemoLogin }) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@company.com"
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc]"
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc]"
               />
             </div>
           </div>
 
           <div>
-            <label className="text-xs font-bold text-slate-700 block mb-1">
+            <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
               Password
             </label>
             <div className="relative">
@@ -210,36 +271,42 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, onDemoLogin }) {
               <input
                 type="password"
                 required
-                minLength={8}
+                minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 text-xs text-slate-900 focus:outline-none focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc]"
+                className="w-full pl-9 pr-3 py-2 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc]"
               />
             </div>
           </div>
 
-          {error && <p role="alert" className="rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{error}</p>}
+          {error && (
+            <p role="alert" className="rounded-lg bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 px-3 py-2 text-xs font-semibold text-rose-700 dark:text-rose-300">
+              {error}
+            </p>
+          )}
 
           <button
             type="submit"
             disabled={isSubmitting}
-            className="w-full py-2.5 px-4 rounded-xl bg-[#0052cc] hover:bg-[#0041a8] text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 mt-2"
+            className="w-full py-2.5 px-4 rounded-xl bg-[#0052cc] hover:bg-[#0041a8] text-white font-bold text-xs shadow-md transition-all cursor-pointer flex items-center justify-center gap-2 mt-2 disabled:opacity-50"
           >
-            <span>{isSubmitting ? 'Working...' : mode === 'signin' ? 'Sign In to Workspace' : 'Create Free Account'}</span>
+            <span>
+              {isSubmitting ? 'Verifying...' : mode === 'signin' ? 'Sign In to Workspace' : 'Create Account'}
+            </span>
             <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </form>
 
         {/* Toggle Mode Footer */}
-        <div className="mt-4 pt-3 border-t border-slate-100 text-center text-xs text-slate-500">
+        <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400">
           {mode === 'signin' ? (
             <p>
               Don't have an account?{' '}
               <button
                 type="button"
-                onClick={() => setMode('signup')}
-                className="font-bold text-[#0052cc] hover:underline cursor-pointer"
+                onClick={() => { setMode('signup'); setError(''); }}
+                className="font-bold text-[#0052cc] dark:text-blue-400 hover:underline cursor-pointer"
               >
                 Sign up free
               </button>
@@ -249,8 +316,8 @@ export function AuthModal({ isOpen, onClose, onLoginSuccess, onDemoLogin }) {
               Already have an account?{' '}
               <button
                 type="button"
-                onClick={() => setMode('signin')}
-                className="font-bold text-[#0052cc] hover:underline cursor-pointer"
+                onClick={() => { setMode('signin'); setError(''); }}
+                className="font-bold text-[#0052cc] dark:text-blue-400 hover:underline cursor-pointer"
               >
                 Sign in
               </button>

@@ -5,498 +5,535 @@ import {
   Calendar,
   User,
   MessageSquare,
-  Sparkles,
-  Bug,
   CheckSquare,
-  AlertCircle,
   Plus,
   Send,
   Clock,
   Layers,
-  ChevronRight,
+  Sparkles,
+  Bug,
+  Flag,
+  CheckCircle2,
+  Paperclip,
+  Download,
+  FileText,
+  Image as ImageIcon,
+  Tag,
 } from 'lucide-react';
-import { useBoard } from '../../context/BoardContext';
-import { useAuth } from '../../context/AuthContext';
-import { TypeBadge, PriorityBadge, SeverityBadge } from '../common/Badge';
+import { useApp } from '../../context/AppContext';
+import { useToast } from '../../context/ToastContext';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 
-export function CardDetailModal() {
+export function CardDetailModal({ taskId, isOpen, onClose }) {
   const {
-    selectedCard,
-    setSelectedCardId,
-    updateCard,
-    deleteCard,
-    addComment,
-    lists,
-  } = useBoard();
+    tasks,
+    allTasks,
+    updateTask,
+    deleteTask,
+    members,
+    currentUser,
+    currentOrg,
+  } = useApp();
+  const toast = useToast();
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
-  const { currentUser, users } = useAuth();
+  const taskList = allTasks || tasks || [];
+  const currentTask = taskList.find((t) => t.id === taskId);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [status, setStatus] = useState('todo');
   const [priority, setPriority] = useState('medium');
   const [type, setType] = useState('task');
-  const [listId, setListId] = useState('');
   const [assigneeId, setAssigneeId] = useState('');
   const [dueDate, setDueDate] = useState('');
-  const [metadata, setMetadata] = useState({});
-  const [newCommentText, setNewCommentText] = useState('');
+  const [checklists, setChecklists] = useState([]);
   const [newChecklistText, setNewChecklistText] = useState('');
+  const [comments, setComments] = useState([]);
+  const [newCommentText, setNewCommentText] = useState('');
+  const [attachments, setAttachments] = useState([]);
+  const [tags, setTags] = useState([]);
+  const [newTagInput, setNewTagInput] = useState('');
 
-  // Sync internal state when card changes
   useEffect(() => {
-    if (selectedCard) {
-      setTitle(selectedCard.title || '');
-      setDescription(selectedCard.description || '');
-      setPriority(selectedCard.priority || 'medium');
-      setType(selectedCard.type || 'task');
-      setListId(selectedCard.listId || '');
-      setAssigneeId(selectedCard.assigneeId || '');
-      setDueDate(selectedCard.dueDate || '');
-      setMetadata(selectedCard.metadata || {});
+    if (currentTask) {
+      setTitle(currentTask.title || '');
+      setDescription(currentTask.description || '');
+      setStatus(currentTask.status || 'todo');
+      setPriority(currentTask.priority || 'medium');
+      setType(currentTask.type || 'task');
+      setAssigneeId(currentTask.assigneeId || '');
+      setDueDate(currentTask.dueDate || '');
+      setChecklists(currentTask.acceptanceCriteria || currentTask.checklists || []);
+      setComments(currentTask.comments || []);
+      setAttachments(currentTask.attachments || []);
+      setTags(currentTask.tags || []);
     }
-  }, [selectedCard]);
+  }, [currentTask]);
 
-  if (!selectedCard) return null;
+  if (!isOpen || !currentTask) return null;
 
-  const handleSaveField = (key, value) => {
-    updateCard(selectedCard.id, { [key]: value });
+  const handleTitleBlur = () => {
+    if (title.trim() && title !== currentTask.title) {
+      updateTask(currentTask.id, { title: title.trim() });
+    }
   };
 
-  const handleMetadataChange = (key, value) => {
-    const updatedMeta = { ...metadata, [key]: value };
-    setMetadata(updatedMeta);
-    updateCard(selectedCard.id, { metadata: updatedMeta });
+  const handleDescriptionBlur = () => {
+    if (description !== currentTask.description) {
+      updateTask(currentTask.id, { description });
+    }
   };
 
-  const handleToggleChecklist = (index, fieldName) => {
-    const list = [...(metadata[fieldName] || [])];
-    list[index].done = !list[index].done;
-    handleMetadataChange(fieldName, list);
+  const handleStatusChange = (newStatus) => {
+    setStatus(newStatus);
+    updateTask(currentTask.id, { status: newStatus });
   };
 
-  const handleAddChecklistItem = (fieldName) => {
+  const handlePriorityChange = (newPriority) => {
+    setPriority(newPriority);
+    updateTask(currentTask.id, { priority: newPriority });
+  };
+
+  const handleTypeChange = (newType) => {
+    setType(newType);
+    updateTask(currentTask.id, { type: newType });
+  };
+
+  const handleAssigneeChange = (newAssigneeId) => {
+    setAssigneeId(newAssigneeId);
+    updateTask(currentTask.id, { assigneeId: newAssigneeId });
+  };
+
+  const handleDueDateChange = (newDate) => {
+    setDueDate(newDate);
+    updateTask(currentTask.id, { dueDate: newDate });
+  };
+
+  // Checklist handlers
+  const handleToggleChecklist = (index) => {
+    const updated = checklists.map((item, idx) =>
+      idx === index ? { ...item, done: !item.done } : item
+    );
+    setChecklists(updated);
+    updateTask(currentTask.id, { acceptanceCriteria: updated });
+  };
+
+  const handleAddChecklist = (e) => {
+    e.preventDefault();
     if (!newChecklistText.trim()) return;
-    const list = [...(metadata[fieldName] || [])];
-    list.push({ text: newChecklistText.trim(), done: false });
-    handleMetadataChange(fieldName, list);
+    const updated = [...checklists, { text: newChecklistText.trim(), done: false }];
+    setChecklists(updated);
+    updateTask(currentTask.id, { acceptanceCriteria: updated });
     setNewChecklistText('');
   };
 
-  const handleRemoveChecklistItem = (index, fieldName) => {
-    const list = [...(metadata[fieldName] || [])];
-    list.splice(index, 1);
-    handleMetadataChange(fieldName, list);
+  const handleDeleteChecklist = (index) => {
+    const updated = checklists.filter((_, idx) => idx !== index);
+    setChecklists(updated);
+    updateTask(currentTask.id, { acceptanceCriteria: updated });
   };
 
-  const handleAddCommentSubmit = (e) => {
+  // Comments handlers
+  const handleAddComment = (e) => {
     e.preventDefault();
-    if (newCommentText.trim()) {
-      addComment(selectedCard.id, newCommentText.trim());
-      setNewCommentText('');
-    }
+    if (!newCommentText.trim()) return;
+    const newComment = {
+      id: `comm-${Date.now()}`,
+      userId: currentUser?.id || 'usr-guest',
+      userName: currentUser?.name || 'Guest User',
+      userAvatar: currentUser?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      text: newCommentText.trim(),
+      createdAt: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+    };
+    const updated = [...comments, newComment];
+    setComments(updated);
+    updateTask(currentTask.id, { comments: updated });
+    setNewCommentText('');
+    toast.success('Comment posted', 'Your note has been added.');
   };
 
-  const currentList = lists.find((l) => l.id === listId);
+  // Attachment upload handler
+  const handleFileUpload = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        const newAttachment = {
+          id: `att-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          url: event.target.result,
+          uploadedAt: new Date().toISOString(),
+        };
+        setAttachments((prev) => {
+          const updated = [...prev, newAttachment];
+          updateTask(currentTask.id, { attachments: updated });
+          return updated;
+        });
+      };
+      reader.readAsDataURL(file);
+    });
+    toast.success('Files attached', `${files.length} attachment(s) uploaded successfully.`);
+    e.target.value = '';
+  };
+
+  const handleDeleteAttachment = (attId) => {
+    const updated = attachments.filter((a) => a.id !== attId);
+    setAttachments(updated);
+    updateTask(currentTask.id, { attachments: updated });
+    toast.info('Attachment removed', 'File attachment was removed.');
+  };
+
+  // Tag handlers
+  const handleAddTag = (e) => {
+    e.preventDefault();
+    const clean = newTagInput.trim().replace(/^#/, '');
+    if (!clean || tags.includes(clean)) return;
+    const updated = [...tags, clean];
+    setTags(updated);
+    updateTask(currentTask.id, { tags: updated });
+    setNewTagInput('');
+  };
+
+  const handleDeleteTag = (tagToRemove) => {
+    const updated = tags.filter((t) => t !== tagToRemove);
+    setTags(updated);
+    updateTask(currentTask.id, { tags: updated });
+  };
+
+  const handleDeleteCard = () => {
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    deleteTask(currentTask.id);
+    toast.success('Task deleted', `"${currentTask.title}" was permanently removed.`);
+    setIsDeleteDialogOpen(false);
+    onClose();
+  };
+
+  const formatFileSize = (bytes) => {
+    if (!bytes) return '0 B';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const completedChecklistCount = checklists.filter((c) => c.done).length;
+  const checklistPercentage = checklists.length > 0 ? Math.round((completedChecklistCount / checklists.length) * 100) : 0;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 overflow-y-auto">
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 bg-slate-950/85 backdrop-blur-md transition-opacity"
-        onClick={() => setSelectedCardId(null)}
-      />
-
-      {/* Modal Container */}
-      <div className="relative w-full max-w-4xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl z-10 my-8 overflow-hidden max-h-[90vh] flex flex-col">
-        {/* Header Bar */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between gap-4 bg-slate-900/90 sticky top-0 z-20">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 overflow-y-auto" role="presentation">
+      <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs transition-opacity" onClick={onClose} />
+      
+      <div className="relative w-full max-w-4xl bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 my-auto flex flex-col max-h-[92vh] overflow-hidden animate-in zoom-in-95 duration-150 text-[#172b4d] dark:text-slate-100">
+        
+        {/* Modal Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 px-6 py-4 bg-slate-50 dark:bg-slate-800/80">
           <div className="flex items-center gap-3">
-            <span className="font-mono text-xs font-bold text-indigo-400 bg-indigo-500/10 px-2 py-1 rounded border border-indigo-500/20">
-              {selectedCard.key}
+            <span className="font-mono text-xs font-extrabold text-[#0052cc] dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2.5 py-1 rounded-lg border border-blue-200 dark:border-blue-800">
+              {currentTask.key || 'TASK'}
             </span>
-            <div className="flex items-center gap-1.5 text-xs text-slate-400">
-              <Layers className="w-3.5 h-3.5" />
-              <span>{currentList?.title || 'List'}</span>
-            </div>
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+              in space <strong className="text-slate-800 dark:text-slate-200">{currentOrg.name}</strong>
+            </span>
           </div>
 
           <div className="flex items-center gap-2">
             <button
-              onClick={() => deleteCard(selectedCard.id)}
-              className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded-lg transition-colors"
+              type="button"
+              onClick={handleDeleteCard}
+              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
               title="Delete Card"
             >
               <Trash2 className="w-4 h-4" />
             </button>
             <button
-              onClick={() => setSelectedCardId(null)}
-              className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+              type="button"
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors cursor-pointer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
-        {/* Modal Body - 2 Columns */}
-        <div className="p-6 overflow-y-auto flex-1 grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Main Content Area (Left 2 cols) */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Title Input */}
+        {/* Modal Body: 2 Columns */}
+        <div className="flex-1 overflow-y-auto p-6 grid grid-cols-1 md:grid-cols-12 gap-6">
+          
+          {/* Left Column: Title, Description, Attachments, Checklists, Comments (8 cols) */}
+          <div className="md:col-span-8 space-y-6">
+            
+            {/* Title */}
             <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
-                Title
-              </label>
               <input
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                onBlur={() => handleSaveField('title', title)}
-                className="w-full text-base sm:text-lg font-bold bg-slate-800/60 border border-slate-700/80 rounded-xl px-3.5 py-2.5 text-slate-100 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                onBlur={handleTitleBlur}
+                className="w-full text-lg sm:text-xl font-extrabold text-[#172b4d] dark:text-slate-100 bg-transparent border-b border-transparent hover:border-slate-300 dark:hover:border-slate-700 focus:border-[#0052cc] focus:bg-slate-50 dark:focus:bg-slate-800/50 px-1 py-1 rounded transition-colors focus:outline-none"
+                placeholder="Issue title..."
               />
             </div>
 
-            {/* Description Textarea */}
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1 block">
+            {/* Description */}
+            <div className="space-y-2">
+              <label className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 block">
                 Description
               </label>
               <textarea
+                rows={4}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                onBlur={() => handleSaveField('description', description)}
-                rows={4}
-                placeholder="Add a detailed description or specification..."
-                className="w-full text-xs sm:text-sm bg-slate-800/40 border border-slate-700/80 rounded-xl p-3 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 resize-y"
+                onBlur={handleDescriptionBlur}
+                placeholder="Add a detailed description, acceptance criteria, or technical notes..."
+                className="w-full p-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-xs sm:text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#0052cc] focus:ring-1 focus:ring-[#0052cc] transition-colors"
               />
             </div>
 
-            {/* Dynamic Factory Pattern Fields Based on Card Type */}
-
-            {/* 1. BUG Specific Fields */}
-            {type === 'bug' && (
-              <div className="p-4 rounded-xl bg-rose-950/20 border border-rose-500/20 space-y-4">
-                <div className="flex items-center gap-2 text-rose-400 font-bold text-xs uppercase tracking-wider">
-                  <Bug className="w-4 h-4" />
-                  <span>Bug Diagnostic Details</span>
+            {/* Attachments Section */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="w-4 h-4 text-[#0052cc] dark:text-blue-400" />
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    Attachments ({attachments.length})
+                  </span>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[11px] text-slate-400 font-medium block mb-1">
-                      Bug Severity
-                    </label>
-                    <select
-                      value={metadata.severity || 'major'}
-                      onChange={(e) => handleMetadataChange('severity', e.target.value)}
-                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-rose-500/30 text-xs text-rose-200 focus:outline-none"
-                    >
-                      <option value="minor">Minor</option>
-                      <option value="major">Major</option>
-                      <option value="critical">Critical</option>
-                      <option value="blocker">Blocker</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[11px] text-slate-400 font-medium block mb-1">
-                      Environment
-                    </label>
-                    <input
-                      type="text"
-                      value={metadata.environment || ''}
-                      onChange={(e) => handleMetadataChange('environment', e.target.value)}
-                      placeholder="e.g. Production / Node 20"
-                      className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:outline-none"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[11px] text-slate-400 font-medium block mb-1">
-                    Reproduction Steps
-                  </label>
-                  <textarea
-                    value={metadata.reproductionSteps || ''}
-                    onChange={(e) => handleMetadataChange('reproductionSteps', e.target.value)}
-                    rows={3}
-                    placeholder="1. Step one\n2. Step two..."
-                    className="w-full p-2.5 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-200 font-mono focus:outline-none"
+                <label className="cursor-pointer flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 dark:bg-blue-950/60 hover:bg-blue-100 dark:hover:bg-blue-900/60 text-[#0052cc] dark:text-blue-300 text-xs font-bold border border-blue-200 dark:border-blue-800 transition-colors">
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>Upload File</span>
+                  <input
+                    type="file"
+                    multiple
+                    onChange={handleFileUpload}
+                    className="hidden"
                   />
-                </div>
+                </label>
               </div>
-            )}
 
-            {/* 2. FEATURE Specific Fields (Story Points & Acceptance Criteria) */}
-            {type === 'feature' && (
-              <div className="p-4 rounded-xl bg-purple-950/20 border border-purple-500/20 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-purple-400 font-bold text-xs uppercase tracking-wider">
-                    <Sparkles className="w-4 h-4" />
-                    <span>Feature Requirements & Acceptance Criteria</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">Story Points:</span>
-                    <input
-                      type="number"
-                      min="1"
-                      max="34"
-                      value={metadata.storyPoints || 3}
-                      onChange={(e) => handleMetadataChange('storyPoints', Number(e.target.value))}
-                      className="w-16 px-2 py-1 rounded bg-slate-900 border border-purple-500/40 text-xs font-bold text-purple-300 text-center"
-                    />
-                  </div>
-                </div>
-
-                {/* Acceptance Criteria Checklist */}
-                <div className="space-y-2">
-                  {(metadata.acceptanceCriteria || []).map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-900/80 border border-slate-800"
-                    >
-                      <label className="flex items-center gap-2.5 flex-1 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={item.done}
-                          onChange={() => handleToggleChecklist(idx, 'acceptanceCriteria')}
-                          className="w-4 h-4 rounded text-purple-600 bg-slate-800 border-slate-700 focus:ring-0"
-                        />
-                        <span
-                          className={`text-xs ${
-                            item.done ? 'line-through text-slate-500' : 'text-slate-200'
-                          }`}
-                        >
-                          {item.text}
-                        </span>
-                      </label>
-                      <button
-                        onClick={() => handleRemoveChecklistItem(idx, 'acceptanceCriteria')}
-                        className="text-slate-500 hover:text-rose-400 p-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-
-                  <div className="flex gap-2 mt-2">
-                    <input
-                      type="text"
-                      value={newChecklistText}
-                      onChange={(e) => setNewChecklistText(e.target.value)}
-                      placeholder="Add acceptance criterion..."
-                      className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddChecklistItem('acceptanceCriteria');
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={() => handleAddChecklistItem('acceptanceCriteria')}
-                      className="px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* 3. TASK Specific Fields (Subtasks) */}
-            {type === 'task' && (
-              <div className="p-4 rounded-xl bg-slate-800/40 border border-slate-700/60 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 text-sky-400 font-bold text-xs uppercase tracking-wider">
-                    <CheckSquare className="w-4 h-4" />
-                    <span>Subtask Checklist</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-slate-400">Est. Hours:</span>
-                    <input
-                      type="number"
-                      min="1"
-                      value={metadata.estimatedHours || 2}
-                      onChange={(e) => handleMetadataChange('estimatedHours', Number(e.target.value))}
-                      className="w-16 px-2 py-1 rounded bg-slate-900 border border-slate-700 text-xs font-bold text-sky-300 text-center"
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  {(metadata.subtasks || []).map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="flex items-center justify-between gap-2 p-2 rounded-lg bg-slate-900/80 border border-slate-800"
-                    >
-                      <label className="flex items-center gap-2.5 flex-1 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={item.done}
-                          onChange={() => handleToggleChecklist(idx, 'subtasks')}
-                          className="w-4 h-4 rounded text-sky-600 bg-slate-800 border-slate-700 focus:ring-0"
-                        />
-                        <span
-                          className={`text-xs ${
-                            item.done ? 'line-through text-slate-500' : 'text-slate-200'
-                          }`}
-                        >
-                          {item.text}
-                        </span>
-                      </label>
-                      <button
-                        onClick={() => handleRemoveChecklistItem(idx, 'subtasks')}
-                        className="text-slate-500 hover:text-rose-400 p-1"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  ))}
-
-                  <div className="flex gap-2 mt-2">
-                    <input
-                      type="text"
-                      value={newChecklistText}
-                      onChange={(e) => setNewChecklistText(e.target.value)}
-                      placeholder="Add subtask item..."
-                      className="flex-1 px-3 py-1.5 rounded-lg bg-slate-900 border border-slate-800 text-xs text-slate-200 focus:outline-none"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleAddChecklistItem('subtasks');
-                        }
-                      }}
-                    />
-                    <button
-                      onClick={() => handleAddChecklistItem('subtasks')}
-                      className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white text-xs font-semibold"
-                    >
-                      Add
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Activity Comments & Collaboration Stream */}
-            <div className="pt-4 border-t border-slate-800">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4 text-indigo-400" />
-                <span>Discussion & Activity ({selectedCard.comments?.length || 0})</span>
-              </h4>
-
-              {/* Comments Feed */}
-              <div className="space-y-3 mb-4 max-h-52 overflow-y-auto">
-                {selectedCard.comments && selectedCard.comments.length > 0 ? (
-                  selectedCard.comments.map((comment) => {
-                    const author = users.find((u) => u.id === comment.userId);
+              {attachments.length > 0 ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {attachments.map((file) => {
+                    const isImg = file.type?.startsWith('image/') || file.url?.startsWith('data:image/');
                     return (
                       <div
-                        key={comment.id}
-                        className="p-3 rounded-xl bg-slate-800/40 border border-slate-800 flex items-start gap-3"
+                        key={file.id}
+                        className="flex items-center justify-between p-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 hover:border-blue-300 dark:hover:border-blue-500 transition-colors group"
                       >
-                        <img
-                          src={author?.avatar}
-                          alt={author?.name}
-                          className="w-7 h-7 rounded-full object-cover border border-slate-700"
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-bold text-slate-200">{author?.name}</span>
-                            <span className="text-[10px] text-slate-500">
-                              {new Date(comment.createdAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })}
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          {isImg ? (
+                            <img
+                              src={file.url}
+                              alt={file.name}
+                              className="w-8 h-8 rounded-lg object-cover border border-slate-200 dark:border-slate-700 flex-shrink-0"
+                            />
+                          ) : (
+                            <div className="w-8 h-8 rounded-lg bg-blue-50 dark:bg-blue-950/60 border border-blue-200 dark:border-blue-800 flex items-center justify-center text-[#0052cc] dark:text-blue-400 flex-shrink-0">
+                              <FileText className="w-4 h-4" />
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-800 dark:text-slate-200 truncate" title={file.name}>
+                              {file.name}
+                            </p>
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500">
+                              {formatFileSize(file.size)}
                             </span>
                           </div>
-                          <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                            {comment.text}
-                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <a
+                            href={file.url}
+                            download={file.name}
+                            className="p-1 text-slate-400 hover:text-[#0052cc] dark:hover:text-blue-400 transition-colors"
+                            title="Download file"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAttachment(file.id)}
+                            className="p-1 text-slate-400 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Delete file"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
                         </div>
                       </div>
                     );
-                  })
-                ) : (
-                  <p className="text-xs text-slate-500 italic">No comments yet. Start the discussion below.</p>
+                  })}
+                </div>
+              ) : (
+                <div className="p-3 border border-dashed border-slate-200 dark:border-slate-800 rounded-xl text-center text-xs text-slate-400 dark:text-slate-500 bg-slate-50/50 dark:bg-slate-800/50">
+                  No attachments yet. Upload design mockups, logs, or screenshots.
+                </div>
+              )}
+            </div>
+
+            {/* Subtasks / Checklist */}
+            <div className="space-y-3 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <CheckSquare className="w-4 h-4 text-[#0052cc] dark:text-blue-400" />
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                    Checklist & Acceptance Criteria
+                  </span>
+                </div>
+                {checklists.length > 0 && (
+                  <span className="text-xs font-bold text-slate-500 dark:text-slate-400">
+                    {completedChecklistCount}/{checklists.length} ({checklistPercentage}%)
+                  </span>
                 )}
               </div>
 
-              {/* Add Comment Input */}
-              <form onSubmit={handleAddCommentSubmit} className="flex gap-2">
+              {/* Progress bar */}
+              {checklists.length > 0 && (
+                <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-500 transition-all duration-300"
+                    style={{ width: `${checklistPercentage}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Items List */}
+              <div className="space-y-1.5">
+                {checklists.map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200/60 dark:border-slate-700 transition-colors group"
+                  >
+                    <label className="flex items-center gap-2.5 cursor-pointer flex-1 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={item.done}
+                        onChange={() => handleToggleChecklist(idx)}
+                        className="w-4 h-4 rounded text-[#0052cc] focus:ring-[#0052cc] cursor-pointer"
+                      />
+                      <span className={`text-xs font-semibold ${item.done ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-800 dark:text-slate-200'}`}>
+                        {item.text}
+                      </span>
+                    </label>
+
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteChecklist(idx)}
+                      className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-rose-600 transition-opacity p-1 cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add checklist item */}
+              <form onSubmit={handleAddChecklist} className="flex gap-2 pt-1">
+                <input
+                  type="text"
+                  value={newChecklistText}
+                  onChange={(e) => setNewChecklistText(e.target.value)}
+                  placeholder="Add item or acceptance criterion..."
+                  className="flex-1 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#0052cc]"
+                />
+                <button
+                  type="submit"
+                  disabled={!newChecklistText.trim()}
+                  className="px-3 py-1.5 rounded-lg bg-[#0052cc] hover:bg-[#0041a8] text-white text-xs font-bold disabled:opacity-40 transition-colors cursor-pointer"
+                >
+                  Add
+                </button>
+              </form>
+            </div>
+
+            {/* Comments Thread */}
+            <div className="space-y-3 pt-4 border-t border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4 text-[#0052cc] dark:text-blue-400" />
+                <span className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wider">
+                  Discussion & Activity ({comments.length})
+                </span>
+              </div>
+
+              {/* Comments List */}
+              <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
+                {comments.length > 0 ? (
+                  comments.map((comm) => (
+                    <div key={comm.id} className="p-3 bg-slate-50 dark:bg-slate-800/60 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <img
+                            src={comm.userAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                            alt={comm.userName}
+                            className="w-5 h-5 rounded-full object-cover"
+                          />
+                          <span className="text-xs font-bold text-slate-900 dark:text-slate-100">{comm.userName}</span>
+                        </div>
+                        <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">{comm.createdAt}</span>
+                      </div>
+                      <p className="text-xs text-slate-700 dark:text-slate-300 pl-7 leading-relaxed">{comm.text}</p>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-400 dark:text-slate-500 italic py-2">No comments yet. Start the discussion!</p>
+                )}
+              </div>
+
+              {/* Add Comment Box */}
+              <form onSubmit={handleAddComment} className="flex gap-2">
                 <input
                   type="text"
                   value={newCommentText}
                   onChange={(e) => setNewCommentText(e.target.value)}
                   placeholder="Write a comment..."
-                  className="flex-1 px-3.5 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                  className="flex-1 px-3 py-2 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#0052cc]"
                 />
                 <button
                   type="submit"
                   disabled={!newCommentText.trim()}
-                  className="px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white text-xs font-semibold flex items-center gap-1.5 transition-colors"
+                  className="px-4 py-2 rounded-xl bg-[#0052cc] hover:bg-[#0041a8] text-white text-xs font-bold disabled:opacity-40 transition-colors cursor-pointer flex items-center gap-1.5"
                 >
                   <Send className="w-3.5 h-3.5" />
                   <span>Send</span>
                 </button>
               </form>
             </div>
+
           </div>
 
-          {/* Sidebar Metadata (Right col) */}
-          <div className="space-y-5 bg-slate-950/40 p-4 rounded-xl border border-slate-800/80">
-            {/* Status Column */}
+          {/* Right Column: Status, Priority, Type, Assignee, Dates, Tags (4 cols) */}
+          <div className="md:col-span-4 bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 rounded-2xl p-4 space-y-4">
+            
+            {/* Status */}
             <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">
-                Status / Column
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1.5">
+                Status
               </label>
               <select
-                value={listId}
-                onChange={(e) => {
-                  setListId(e.target.value);
-                  handleSaveField('listId', e.target.value);
-                }}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200 focus:outline-none"
+                value={status}
+                onChange={(e) => handleStatusChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#0052cc] cursor-pointer"
               >
-                {lists.map((l) => (
-                  <option key={l.id} value={l.id}>
-                    {l.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Type */}
-            <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">
-                Issue Type
-              </label>
-              <select
-                value={type}
-                onChange={(e) => {
-                  setType(e.target.value);
-                  handleSaveField('type', e.target.value);
-                }}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200 focus:outline-none"
-              >
-                <option value="task">Task</option>
-                <option value="feature">Feature</option>
-                <option value="bug">Bug</option>
+                <option value="todo">To Do</option>
+                <option value="in_progress">In Progress</option>
+                <option value="done">Done</option>
               </select>
             </div>
 
             {/* Priority */}
             <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1.5">
                 Priority
               </label>
               <select
                 value={priority}
-                onChange={(e) => {
-                  setPriority(e.target.value);
-                  handleSaveField('priority', e.target.value);
-                }}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200 focus:outline-none"
+                onChange={(e) => handlePriorityChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#0052cc] cursor-pointer"
               >
                 <option value="urgent">Urgent</option>
                 <option value="high">High</option>
@@ -505,23 +542,38 @@ export function CardDetailModal() {
               </select>
             </div>
 
+            {/* Issue Type */}
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1.5">
+                Issue Type
+              </label>
+              <select
+                value={type}
+                onChange={(e) => handleTypeChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#0052cc] cursor-pointer"
+              >
+                <option value="task">Task</option>
+                <option value="feature">Feature</option>
+                <option value="story">Story</option>
+                <option value="bug">Bug</option>
+                <option value="epic">Epic</option>
+              </select>
+            </div>
+
             {/* Assignee */}
             <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1.5">
                 Assignee
               </label>
               <select
                 value={assigneeId}
-                onChange={(e) => {
-                  setAssigneeId(e.target.value);
-                  handleSaveField('assigneeId', e.target.value || null);
-                }}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs font-semibold text-slate-200 focus:outline-none"
+                onChange={(e) => handleAssigneeChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#0052cc] cursor-pointer"
               >
                 <option value="">Unassigned</option>
-                {users.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.name} ({u.title})
+                {members.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.title || 'Member'})
                   </option>
                 ))}
               </select>
@@ -529,22 +581,79 @@ export function CardDetailModal() {
 
             {/* Due Date */}
             <div>
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-1.5 block">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1.5">
                 Due Date
               </label>
               <input
                 type="date"
                 value={dueDate}
-                onChange={(e) => {
-                  setDueDate(e.target.value);
-                  handleSaveField('dueDate', e.target.value);
-                }}
-                className="w-full px-3 py-2 rounded-lg bg-slate-900 border border-slate-700 text-xs text-slate-200 focus:outline-none"
+                onChange={(e) => handleDueDateChange(e.target.value)}
+                className="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl text-xs font-semibold text-slate-800 dark:text-slate-100 focus:outline-none focus:border-[#0052cc] cursor-pointer"
               />
             </div>
+
+            {/* Tags / Labels */}
+            <div>
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300 block mb-1.5">
+                Labels & Tags
+              </label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {tags.map((tag, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1 text-[11px] font-semibold px-2 py-0.5 rounded-lg bg-blue-50 dark:bg-blue-950/60 text-[#0052cc] dark:text-blue-300 border border-blue-200 dark:border-blue-800"
+                  >
+                    #{tag}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteTag(tag)}
+                      className="text-slate-400 hover:text-rose-600 cursor-pointer"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                ))}
+              </div>
+              <form onSubmit={handleAddTag} className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={newTagInput}
+                  onChange={(e) => setNewTagInput(e.target.value)}
+                  placeholder="New tag..."
+                  className="w-full px-2.5 py-1.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs font-medium text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-[#0052cc]"
+                />
+                <button
+                  type="submit"
+                  disabled={!newTagInput.trim()}
+                  className="px-2.5 py-1.5 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-40 rounded-lg text-xs font-bold text-slate-700 dark:text-slate-200 cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
+              </form>
+            </div>
+
+            {/* Metadata Footer */}
+            <div className="pt-3 border-t border-slate-200 dark:border-slate-700 text-[11px] text-slate-400 dark:text-slate-500 space-y-1">
+              <div>Created: {currentTask.dueDate || 'Recently'}</div>
+              <div>Space: {currentOrg.name}</div>
+            </div>
+
           </div>
+
         </div>
+
       </div>
+
+      <ConfirmDialog
+        isOpen={isDeleteDialogOpen}
+        onClose={() => setIsDeleteDialogOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title="Delete Task"
+        description={`Are you sure you want to permanently delete "${currentTask?.title || 'this task'}"? All checklist items, comments, and attachments will be deleted.`}
+        confirmText="Delete Task"
+        cancelText="Cancel"
+        variant="danger"
+      />
     </div>
   );
 }

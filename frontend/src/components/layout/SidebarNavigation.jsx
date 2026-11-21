@@ -19,9 +19,11 @@ import {
   Star,
   Users,
   X,
+  Trash2,
 } from 'lucide-react';
 import { useApp } from '../../context/AppContext';
 import { CreateSpaceModal } from '../team/CreateSpaceModal';
+import { ConfirmDialog } from '../common/ConfirmDialog';
 
 const defaultItems = [
   { id: 'personal', label: 'For you', icon: Sparkles },
@@ -57,11 +59,14 @@ export function SidebarNavigation({ isMobileOpen, onClose }) {
     currentOrg,
     selectOrg,
     viewMode,
+    currentUser,
+    deleteSpace,
   } = useApp();
 
   const [preferences, setPreferences] = useState(readPreferences);
   const [isCreateSpaceOpen, setIsCreateSpaceOpen] = useState(false);
   const [isSpacesExpanded, setIsSpacesExpanded] = useState(true);
+  const [spaceToDelete, setSpaceToDelete] = useState(null);
 
   const items = useMemo(() => {
     const order = preferences.order || defaultItems.map((item) => item.id);
@@ -106,19 +111,19 @@ export function SidebarNavigation({ isMobileOpen, onClose }) {
         />
       )}
       <aside
-        className={`fixed inset-y-16 left-0 z-50 flex w-64 flex-col border-r border-slate-200 bg-white px-3 py-4 shadow-xl transition-transform lg:sticky lg:top-16 lg:z-20 lg:h-[calc(100vh-4rem)] lg:shrink-0 lg:translate-x-0 lg:shadow-none ${
+        className={`fixed inset-y-16 left-0 z-50 flex w-64 flex-col border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-3 py-4 shadow-xl transition-transform lg:sticky lg:top-16 lg:z-20 lg:h-[calc(100vh-4rem)] lg:shrink-0 lg:translate-x-0 lg:shadow-none ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         aria-label="Workspace navigation"
       >
         <div className="mb-3 flex items-center justify-between px-2 lg:hidden">
-          <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+          <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
             Navigation
           </span>
           <button
             onClick={onClose}
             aria-label="Close navigation"
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-100"
+            className="rounded-lg p-1.5 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
           >
             <X className="h-4 w-4" />
           </button>
@@ -141,7 +146,7 @@ export function SidebarNavigation({ isMobileOpen, onClose }) {
                     <button
                       type="button"
                       onClick={() => setIsSpacesExpanded((prev) => !prev)}
-                      className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 hover:text-slate-600 transition-colors cursor-pointer"
+                      className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 transition-colors cursor-pointer"
                     >
                       {isSpacesExpanded ? (
                         <ChevronDown className="w-3.5 h-3.5" />
@@ -154,7 +159,7 @@ export function SidebarNavigation({ isMobileOpen, onClose }) {
                       type="button"
                       onClick={() => setIsCreateSpaceOpen(true)}
                       title="Create a new Space"
-                      className="rounded-md p-1 text-slate-400 hover:bg-blue-50 hover:text-[#0052cc] transition-colors cursor-pointer"
+                      className="rounded-md p-1 text-slate-400 dark:text-slate-500 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:text-[#0052cc] dark:hover:text-blue-400 transition-colors cursor-pointer"
                     >
                       <Plus className="h-3.5 w-3.5" />
                     </button>
@@ -165,15 +170,17 @@ export function SidebarNavigation({ isMobileOpen, onClose }) {
                       {userSpaces.map((space) => {
                         const isSpaceActive =
                           viewMode === 'team' && currentOrg.id === space.id;
+                        const ownerIdStr = space.ownerId?._id ? space.ownerId._id.toString() : space.ownerId?.toString();
+                        const isAdmin = space.role === 'admin' || (currentUser?.id && ownerIdStr === currentUser.id.toString());
+
                         return (
-                          <button
+                          <div
                             key={space.id}
-                            type="button"
                             onClick={() => handleSelectSpace(space.id)}
-                            className={`flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition-colors cursor-pointer ${
+                            className={`group flex w-full items-center justify-between gap-1.5 rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition-colors cursor-pointer ${
                               isSpaceActive
-                                ? 'bg-blue-50 text-[#0052cc] font-bold shadow-xs'
-                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                                ? 'bg-blue-50 dark:bg-blue-950/60 text-[#0052cc] dark:text-blue-400 font-bold shadow-xs'
+                                : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                             }`}
                           >
                             <div className="flex items-center gap-2 min-w-0 flex-1">
@@ -183,16 +190,31 @@ export function SidebarNavigation({ isMobileOpen, onClose }) {
                               />
                               <span className="truncate">{space.name}</span>
                             </div>
-                            <span
-                              className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-bold ${
-                                isSpaceActive
-                                  ? 'bg-blue-100 text-[#0052cc]'
-                                  : 'bg-slate-100 text-slate-500'
-                              }`}
-                            >
-                              {space.role || 'Member'}
-                            </span>
-                          </button>
+                            <div className="flex items-center gap-1">
+                              {isAdmin && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setSpaceToDelete(space);
+                                  }}
+                                  title="Delete Space (Admin only)"
+                                  className="opacity-0 group-hover:opacity-100 hover:text-rose-600 p-0.5 rounded transition-opacity cursor-pointer text-slate-400 dark:text-slate-500"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              )}
+                              <span
+                                className={`text-[9px] uppercase px-1.5 py-0.5 rounded font-bold ${
+                                  isSpaceActive
+                                    ? 'bg-blue-100 dark:bg-blue-900/60 text-[#0052cc] dark:text-blue-300'
+                                    : 'bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                                }`}
+                              >
+                                {space.role || 'Member'}
+                              </span>
+                            </div>
+                          </div>
                         );
                       })}
 
@@ -200,7 +222,7 @@ export function SidebarNavigation({ isMobileOpen, onClose }) {
                       <button
                         type="button"
                         onClick={() => setIsCreateSpaceOpen(true)}
-                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-[#0052cc] hover:bg-blue-50 hover:text-[#0041a8] transition-colors cursor-pointer border border-dashed border-blue-200/80 mt-1"
+                        className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-[#0052cc] dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/60 hover:text-[#0041a8] dark:hover:text-blue-300 transition-colors cursor-pointer border border-dashed border-blue-200/80 dark:border-blue-800/80 mt-1"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         <span>+ Create Space</span>
@@ -216,7 +238,7 @@ export function SidebarNavigation({ isMobileOpen, onClose }) {
                 {item.section &&
                   item.section !== previous?.section &&
                   item.section !== 'Spaces' && (
-                    <p className="mb-1 mt-4 px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    <p className="mb-1 mt-4 px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       {item.section}
                     </p>
                   )}
@@ -225,8 +247,8 @@ export function SidebarNavigation({ isMobileOpen, onClose }) {
                   aria-current={active ? 'page' : undefined}
                   className={`mb-0.5 flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-xs font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0052cc] ${
                     active
-                      ? 'bg-blue-50 text-[#0052cc]'
-                      : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                      ? 'bg-blue-50 dark:bg-blue-950/60 text-[#0052cc] dark:text-blue-400'
+                      : 'text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white'
                   }`}
                 >
                   <Icon className="h-4 w-4" />
@@ -243,6 +265,22 @@ export function SidebarNavigation({ isMobileOpen, onClose }) {
       <CreateSpaceModal
         isOpen={isCreateSpaceOpen}
         onClose={() => setIsCreateSpaceOpen(false)}
+      />
+
+      <ConfirmDialog
+        isOpen={Boolean(spaceToDelete)}
+        onClose={() => setSpaceToDelete(null)}
+        onConfirm={async () => {
+          if (spaceToDelete) {
+            await deleteSpace(spaceToDelete.id || spaceToDelete._id);
+            setSpaceToDelete(null);
+          }
+        }}
+        title={`Delete "${spaceToDelete?.name}"?`}
+        description="Are you sure you want to permanently delete this space? All associated boards, cards, plans, and chat channels will be erased. This action cannot be undone."
+        confirmText="Delete Space"
+        cancelText="Cancel"
+        variant="danger"
       />
     </>
   );
@@ -271,10 +309,10 @@ function SidebarCustomizer({ preferences, setPreferences }) {
     });
 
   return (
-    <div className="mt-3 border-t border-slate-100 pt-3">
+    <div className="mt-3 border-t border-slate-100 dark:border-slate-800 pt-3">
       <button
         onClick={() => setOpen(true)}
-        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-100 hover:text-slate-900 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0052cc]"
+        className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 transition-colors hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-900 dark:hover:text-white focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[#0052cc]"
       >
         <Settings2 className="h-4 w-4" />
         Customize sidebar
@@ -284,27 +322,27 @@ function SidebarCustomizer({ preferences, setPreferences }) {
           <button
             aria-label="Close sidebar customization"
             onClick={() => setOpen(false)}
-            className="absolute inset-0 bg-slate-950/30 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-950/40 backdrop-blur-xs"
           />
           <section
             role="dialog"
             aria-modal="true"
             aria-labelledby="sidebar-settings-title"
-            className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-xl"
+            className="relative z-10 w-full max-w-md rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-5 shadow-2xl"
           >
             <div className="flex items-start justify-between">
               <div>
-                <h2 id="sidebar-settings-title" className="text-lg font-extrabold text-[#172b4d]">
+                <h2 id="sidebar-settings-title" className="text-lg font-extrabold text-[#172b4d] dark:text-slate-100">
                   Customize sidebar
                 </h2>
-                <p className="mt-0.5 text-xs text-slate-500">
+                <p className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
                   Choose what appears and arrange the order.
                 </p>
               </div>
               <button
                 onClick={() => setOpen(false)}
                 aria-label="Close"
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100"
+                className="rounded-lg p-1.5 text-slate-400 dark:text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -316,10 +354,10 @@ function SidebarCustomizer({ preferences, setPreferences }) {
                 return (
                   <div
                     key={item.id}
-                    className="flex items-center gap-2 rounded-xl border border-slate-100 px-2 py-2"
+                    className="flex items-center gap-2 rounded-xl border border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-800/40 px-2 py-2"
                   >
-                    <Icon className="h-4 w-4 text-[#0052cc]" />
-                    <span className="flex-1 text-xs font-semibold text-slate-700">{item.label}</span>
+                    <Icon className="h-4 w-4 text-[#0052cc] dark:text-blue-400" />
+                    <span className="flex-1 text-xs font-semibold text-slate-700 dark:text-slate-200">{item.label}</span>
                     <button
                       onClick={() =>
                         setPreferences((current) => ({
@@ -329,7 +367,7 @@ function SidebarCustomizer({ preferences, setPreferences }) {
                             : [...(current.hidden || []), item.id],
                         }))
                       }
-                      className="rounded-md px-2 py-1 text-[11px] font-bold text-slate-500 hover:bg-slate-100"
+                      className="rounded-md px-2 py-1 text-[11px] font-bold text-slate-500 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 cursor-pointer"
                     >
                       {hidden ? 'Show' : 'Hide'}
                     </button>
@@ -337,7 +375,7 @@ function SidebarCustomizer({ preferences, setPreferences }) {
                       disabled={index === 0}
                       onClick={() => move(item.id, -1)}
                       aria-label={`Move ${item.label} up`}
-                      className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                      className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer"
                     >
                       <ChevronUp className="h-4 w-4" />
                     </button>
@@ -345,7 +383,7 @@ function SidebarCustomizer({ preferences, setPreferences }) {
                       disabled={index === ordered.length - 1}
                       onClick={() => move(item.id, 1)}
                       aria-label={`Move ${item.label} down`}
-                      className="rounded p-1 text-slate-500 hover:bg-slate-100 disabled:opacity-30"
+                      className="rounded p-1 text-slate-500 dark:text-slate-400 hover:bg-slate-200/60 dark:hover:bg-slate-700 disabled:opacity-30 cursor-pointer"
                     >
                       <ChevronDown className="h-4 w-4" />
                     </button>
