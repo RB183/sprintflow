@@ -13,6 +13,9 @@ const createEntityId = (prefix) => `${prefix}-${Date.now()}-${Math.floor(Math.ra
 export function AppProvider({ children }) {
   const toast = useToast();
 
+  // Unique identifier for this specific browser tab instance
+  const tabClientIdRef = useRef('tab_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36));
+
   // Authentication State
   const [currentUser, setCurrentUser] = useState(() => {
     const saved = localStorage.getItem('sprintflow_auth_user');
@@ -860,6 +863,7 @@ export function AppProvider({ children }) {
       channelId: activeChannelId,
       orgId: orgId.toString(),
       userId: (currentUser.id || currentUser._id)?.toString(),
+      senderClientId: tabClientIdRef.current,
       userName: currentUser.name || currentUser.username || 'User',
       username: currentUser.name || currentUser.username || 'User',
       userAvatar: currentUser.avatar || '',
@@ -1068,6 +1072,7 @@ export function AppProvider({ children }) {
         setActiveChannelId,
         chatMessages: chatMessages.filter((m) => m.channelId === activeChannelId),
         sendChatMessage,
+        tabClientId: tabClientIdRef.current,
         // Notifications
         notifications,
         unreadNotificationsCount,

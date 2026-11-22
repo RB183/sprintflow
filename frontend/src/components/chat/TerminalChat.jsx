@@ -41,6 +41,7 @@ export function TerminalChat() {
     members,
     currentUser,
     currentOrg,
+    tabClientId,
   } = useApp();
 
   const [inputMessage, setInputMessage] = useState('');
@@ -159,17 +160,16 @@ export function TerminalChat() {
               chatMessages.map((msg) => {
                 const currentUserIdStr = (currentUser?.id || currentUser?._id)?.toString();
                 const msgUserIdStr = (msg.userId || msg.senderId)?.toString();
-                const isMe = Boolean(
-                  currentUser && (
-                    (currentUserIdStr && msgUserIdStr && currentUserIdStr === msgUserIdStr) ||
-                    (msg.userName && currentUser.name && msg.userName.toLowerCase() === currentUser.name.toLowerCase()) ||
-                    (msg.username && currentUser.name && msg.username.toLowerCase() === currentUser.name.toLowerCase())
-                  )
-                );
 
-                const senderName = isMe
-                  ? 'You'
-                  : msg.userName || msg.username || msg.senderName || 'Team Member';
+                // Differentiate outgoing (sent from this active tab/client) vs incoming (received from peers)
+                let isMe = false;
+                if (msg.senderClientId && tabClientId) {
+                  isMe = msg.senderClientId === tabClientId;
+                } else if (currentUserIdStr && msgUserIdStr) {
+                  isMe = currentUserIdStr === msgUserIdStr;
+                }
+
+                const senderName = msg.userName || msg.username || msg.senderName || 'Team Member';
                 const senderAvatar = msg.userAvatar || msg.avatar || msg.senderAvatar;
                 const senderRole = msg.role || 'member';
                 const timeString = msg.timestamp || (msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '');
@@ -207,28 +207,28 @@ export function TerminalChat() {
                           : 'bg-white text-slate-800 border border-slate-200 rounded-bl-xs'
                       }`}
                     >
-                      {/* Group Chat Sender Header */}
-                      {!isMe ? (
-                        <div className="flex items-center gap-1.5 pb-0.5">
+                      {/* Group Chat Sender Header: ALWAYS clearly identifies the sender name */}
+                      <div className="flex items-center justify-between gap-3 pb-0.5">
+                        <div className="flex items-center gap-1.5">
                           <span
                             className="font-bold text-xs"
-                            style={{ color: getSenderColor(senderName) }}
+                            style={{ color: isMe ? '#065f46' : getSenderColor(senderName) }}
                           >
                             {senderName}
                           </span>
-                          {senderRole && senderRole !== 'member' && (
-                            <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-blue-50 text-[#0052cc] border border-blue-100">
-                              {senderRole}
+                          {isMe ? (
+                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-100/70 px-1.5 py-0.2 rounded">
+                              You
                             </span>
+                          ) : (
+                            senderRole && senderRole !== 'member' && (
+                              <span className="text-[9px] font-bold uppercase px-1.5 py-0.2 rounded bg-blue-50 text-[#0052cc] border border-blue-100">
+                                {senderRole}
+                              </span>
+                            )
                           )}
                         </div>
-                      ) : (
-                        <div className="flex items-center justify-between gap-3 pb-0.5">
-                          <span className="text-[10px] font-bold text-emerald-800">
-                            You
-                          </span>
-                        </div>
-                      )}
+                      </div>
 
                       {/* Message Content */}
                       <p className="text-xs leading-relaxed break-words whitespace-pre-wrap">
