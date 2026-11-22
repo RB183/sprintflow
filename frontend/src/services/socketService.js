@@ -33,6 +33,9 @@ class SocketService {
     this.socket = null;
     this.connected = false;
     this.currentUserId = null;
+    this.currentBoardId = null;
+    this.currentCanvasOrgId = null;
+    this.currentChannelId = null;
     this.initSocket();
   }
 
@@ -52,6 +55,15 @@ class SocketService {
         if (this.currentUserId) {
           this.socket.emit('user:join', this.currentUserId);
           this.socket.emit('join:user', this.currentUserId);
+        }
+        if (this.currentBoardId) {
+          this.socket.emit('board:join', this.currentBoardId);
+        }
+        if (this.currentCanvasOrgId) {
+          this.socket.emit('canvas:join_room', this.currentCanvasOrgId);
+        }
+        if (this.currentChannelId) {
+          this.socket.emit('chat:join_channel', this.currentChannelId);
         }
       });
 
@@ -107,25 +119,31 @@ class SocketService {
   }
 
   joinBoard(boardId) {
-    if (this.socket?.connected) {
-      this.socket.emit('board:join', boardId);
+    if (!boardId) return;
+    this.currentBoardId = boardId.toString();
+    if (this.socket) {
+      this.socket.emit('board:join', this.currentBoardId);
     }
   }
 
   joinCanvas(orgId) {
-    if (this.socket?.connected) {
-      this.socket.emit('canvas:join_room', orgId);
+    if (!orgId) return;
+    this.currentCanvasOrgId = orgId.toString();
+    if (this.socket) {
+      this.socket.emit('canvas:join_room', this.currentCanvasOrgId);
     }
   }
 
   joinChat(channelId) {
-    if (this.socket?.connected) {
-      this.socket.emit('chat:join_channel', channelId);
+    if (!channelId) return;
+    this.currentChannelId = channelId.toString();
+    if (this.socket) {
+      this.socket.emit('chat:join_channel', this.currentChannelId);
     }
   }
 
   emitCardMoved(data) {
-    if (this.socket?.connected) {
+    if (this.socket) {
       this.socket.emit('board:card_moved', data);
     }
     this.broadcastToast({
@@ -140,7 +158,7 @@ class SocketService {
   }
 
   emitCardCreated(data) {
-    if (this.socket?.connected) {
+    if (this.socket) {
       this.socket.emit('board:card_created', data);
     }
     this.broadcastToast({
@@ -153,7 +171,7 @@ class SocketService {
   }
 
   emitCardUpdated(data) {
-    if (this.socket?.connected) {
+    if (this.socket) {
       this.socket.emit('board:card_updated', data);
     }
     this.broadcastToast({
@@ -166,25 +184,25 @@ class SocketService {
   }
 
   emitCardDeleted(data) {
-    if (this.socket?.connected) {
+    if (this.socket) {
       this.socket.emit('board:card_deleted', data);
     }
   }
 
   emitCanvasStroke(data) {
-    if (this.socket?.connected) {
+    if (this.socket) {
       this.socket.emit('canvas:draw_stroke', data);
     }
   }
 
   emitCanvasClear(data) {
-    if (this.socket?.connected) {
+    if (this.socket) {
       this.socket.emit('canvas:clear', data);
     }
   }
 
   emitChatMessage(data) {
-    if (this.socket?.connected) {
+    if (this.socket) {
       this.socket.emit('chat:send_message', data);
     }
   }

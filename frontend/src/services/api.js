@@ -246,10 +246,10 @@ class ApiService {
     return this.request(`/channels/${channelId}/messages`);
   }
 
-  async sendMessage(channelId, text) {
+  async sendMessage(channelId, text, extra = {}) {
     return this.request(`/channels/${channelId}/messages`, {
       method: 'POST',
-      body: JSON.stringify({ text }),
+      body: JSON.stringify({ text, ...extra }),
     });
   }
 

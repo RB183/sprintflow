@@ -288,10 +288,18 @@ export function AppProvider({ children }) {
     };
 
     const handleRemoteChatMessage = (data) => {
-      if (data?.id) {
+      const msg = data?.message || data;
+      if (msg && (msg.id || msg._id) && msg.text) {
+        const cleanMsg = {
+          ...msg,
+          id: (msg.id || msg._id).toString(),
+          userName: msg.userName || msg.username || msg.senderName || 'Team Member',
+          username: msg.username || msg.userName || msg.senderName || 'Team Member',
+          userAvatar: msg.userAvatar || msg.avatar || '',
+        };
         setChatMessages((prev) => {
-          if (prev.some((m) => m.id === data.id)) return prev;
-          return [...prev, data];
+          if (prev.some((m) => (m.id || m._id)?.toString() === cleanMsg.id)) return prev;
+          return [...prev, cleanMsg];
         });
       }
     };
@@ -846,20 +854,46 @@ export function AppProvider({ children }) {
   // Chat
   const sendChatMessage = (text) => {
     if (!text.trim() || !currentUser) return;
+    const orgId = currentOrgId || currentOrg?.id || currentOrg?._id || '';
     const newMessage = {
       id: createEntityId('msg'),
       channelId: activeChannelId,
-      userId: currentUser.id,
-      userName: currentUser.name,
-      userAvatar: currentUser.avatar,
+      orgId: orgId.toString(),
+      userId: (currentUser.id || currentUser._id)?.toString(),
+      userName: currentUser.name || currentUser.username || 'User',
+      username: currentUser.name || currentUser.username || 'User',
+      userAvatar: currentUser.avatar || '',
+      role: currentOrg?.role || 'member',
       text: text.trim(),
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: new Date().toISOString(),
     };
 
     setChatMessages((prev) => [...prev, newMessage]);
-    socketService.emitChatMessage({ channelId: activeChannelId, message: newMessage });
-    api.sendMessage(activeChannelId, text.trim()).catch(() => {});
+    socketService.emitChatMessage({
+      channelId: activeChannelId,
+      orgId: orgId.toString(),
+      message: newMessage,
+    });
+    api.sendMessage(activeChannelId, text.trim(), {
+      userAvatar: currentUser.avatar || '',
+      role: currentOrg?.role || 'member',
+    }).catch(() => {});
   };
+
+  // Persist chat messages to local storage
+  useEffect(() => {
+    try {
+      localStorage.setItem('sprintflow_light_chat', JSON.stringify(chatMessages.slice(-200)));
+    } catch (_) {}
+  }, [chatMessages]);
+
+  // Join active chat channel socket room
+  useEffect(() => {
+    if (activeChannelId) {
+      socketService.joinChat(activeChannelId);
+    }
+  }, [activeChannelId]);
 
   // Auth operations
   const login = (user, token) => {

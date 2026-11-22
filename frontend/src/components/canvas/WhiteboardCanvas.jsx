@@ -65,6 +65,7 @@ export function WhiteboardCanvas() {
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
   const [savedSnapshot, setSavedSnapshot] = useState(null);
   const [lastSavedTime, setLastSavedTime] = useState('Just now');
+  const lastPointRef = useRef(null);
 
   // Text tool
   const [textInput, setTextInput] = useState('');
@@ -74,8 +75,9 @@ export function WhiteboardCanvas() {
   const [historyStack, setHistoryStack] = useState([]);
   const [redoStack, setRedoStack] = useState([]);
 
+  const currentOrgIdStr = (currentOrg?.id || currentOrg?._id || 'default').toString();
   const canvasBackground = theme === 'dark' ? '#0f172a' : '#ffffff';
-  const canvasStorageKey = `canvas_${theme === 'dark' ? 'dark' : 'light'}_${currentOrg.id}`;
+  const canvasStorageKey = `canvas_${theme === 'dark' ? 'dark' : 'light'}_${currentOrgIdStr}`;
 
   const colors = [
     { name: 'Royal Blue', hex: '#0052cc' },
@@ -130,6 +132,85 @@ export function WhiteboardCanvas() {
   useEffect(() => {
     setupCanvas();
   }, [setupCanvas]);
+
+  // Join canvas socket room & listen for live drawing events from collaborators
+  useEffect(() => {
+    if (currentOrgIdStr) {
+      socketService.joinCanvas(currentOrgIdStr);
+    }
+
+    const handleRemoteStroke = (data) => {
+      if (!data) return;
+      if (data.orgId && data.orgId.toString() !== currentOrgIdStr) return;
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+
+      if (data.type === 'draw_step' && data.from && data.to) {
+        ctx.save();
+        ctx.strokeStyle = data.color;
+        ctx.lineWidth = data.lineWidth;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        ctx.moveTo(data.from.x, data.from.y);
+        ctx.lineTo(data.to.x, data.to.y);
+        ctx.stroke();
+        ctx.restore();
+      } else if (data.type === 'full_snapshot' && data.snapshot) {
+        const img = new Image();
+        img.onload = () => {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(img, 0, 0);
+          try {
+            localStorage.setItem(canvasStorageKey, data.snapshot);
+          } catch (_) {}
+        };
+        img.src = data.snapshot;
+      }
+    };
+
+    const handleRemoteClear = (data) => {
+      if (data?.orgId && data.orgId.toString() !== currentOrgIdStr) return;
+
+      const canvas = canvasRef.current;
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = canvasBackground;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      try {
+        localStorage.removeItem(canvasStorageKey);
+      } catch (_) {}
+    };
+
+    socketService.on('canvas:remote_stroke', handleRemoteStroke);
+    socketService.on('canvas:remote_clear', handleRemoteClear);
+
+    return () => {
+      socketService.off('canvas:remote_stroke', handleRemoteStroke);
+      socketService.off('canvas:remote_clear', handleRemoteClear);
+    };
+  }, [currentOrgIdStr, canvasBackground, canvasStorageKey]);
+
+  // Sync canvas snapshot from backend database on mount
+  useEffect(() => {
+    if (!currentOrgIdStr || currentOrgIdStr === 'default') return;
+    api.getCanvas(currentOrgIdStr).then((res) => {
+      if (res?.canvas?.snapshotData && canvasRef.current) {
+        const canvas = canvasRef.current;
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        img.onload = () => {
+          ctx.drawImage(img, 0, 0);
+          try {
+            localStorage.setItem(canvasStorageKey, res.canvas.snapshotData);
+          } catch (_) {}
+        };
+        img.src = res.canvas.snapshotData;
+      }
+    }).catch(() => {});
+  }, [currentOrgIdStr, canvasStorageKey]);
 
   // Fullscreen change listener
   useEffect(() => {
@@ -386,13 +467,21 @@ export function WhiteboardCanvas() {
     setRedoStack([]);
   };
 
-  const autoSaveCanvas = () => {
+  const autoSaveCanvas = (broadcast = false) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const dataUrl = canvas.toDataURL();
     localStorage.setItem(canvasStorageKey, dataUrl);
     setLastSavedTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
-    api.saveCanvasSnapshot(currentOrg.id, dataUrl).catch(() => {});
+    api.saveCanvasSnapshot(currentOrgIdStr, dataUrl).catch(() => {});
+
+    if (broadcast && currentOrgIdStr) {
+      socketService.emitCanvasStroke({
+        orgId: currentOrgIdStr,
+        type: 'full_snapshot',
+        snapshot: dataUrl,
+      });
+    }
   };
 
   const handleUndo = () => {
@@ -409,7 +498,7 @@ export function WhiteboardCanvas() {
     img.onload = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
-      autoSaveCanvas();
+      autoSaveCanvas(true);
     };
     img.src = previousData;
   };
@@ -426,7 +515,7 @@ export function WhiteboardCanvas() {
     img.onload = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       ctx.drawImage(img, 0, 0);
-      autoSaveCanvas();
+      autoSaveCanvas(true);
     };
     img.src = nextData;
   };
@@ -448,6 +537,7 @@ export function WhiteboardCanvas() {
     }
 
     const { x, y } = getCanvasCoords(e);
+    lastPointRef.current = { x, y };
 
     if (tool === 'text') {
       setTextPos({ x, y });
@@ -483,18 +573,48 @@ export function WhiteboardCanvas() {
     const isDark = theme === 'dark';
 
     if (tool === 'pen') {
+      const from = lastPointRef.current || { x, y };
       ctx.strokeStyle = color;
       ctx.lineWidth = lineWidth;
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
       ctx.lineTo(x, y);
       ctx.stroke();
+
+      socketService.emitCanvasStroke({
+        orgId: currentOrgIdStr,
+        type: 'draw_step',
+        tool: 'pen',
+        from,
+        to: { x, y },
+        color,
+        lineWidth,
+      });
+      lastPointRef.current = { x, y };
     } else if (tool === 'eraser') {
+      const from = lastPointRef.current || { x, y };
+      const eraserWidth = lineWidth * 7;
       ctx.strokeStyle = canvasBackground;
-      ctx.lineWidth = lineWidth * 7;
+      ctx.lineWidth = eraserWidth;
       ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
       ctx.lineTo(x, y);
       ctx.stroke();
+
+      socketService.emitCanvasStroke({
+        orgId: currentOrgIdStr,
+        type: 'draw_step',
+        tool: 'eraser',
+        from,
+        to: { x, y },
+        color: canvasBackground,
+        lineWidth: eraserWidth,
+      });
+      lastPointRef.current = { x, y };
     } else if (savedSnapshot) {
       ctx.putImageData(savedSnapshot, 0, 0);
       ctx.strokeStyle = color;
@@ -566,7 +686,8 @@ export function WhiteboardCanvas() {
     }
     if (isDrawing) {
       setIsDrawing(false);
-      autoSaveCanvas();
+      lastPointRef.current = null;
+      autoSaveCanvas(true);
     }
   };
 
@@ -583,7 +704,7 @@ export function WhiteboardCanvas() {
 
     setTextInput('');
     setTextPos(null);
-    autoSaveCanvas();
+    autoSaveCanvas(true);
   };
 
   const handleQuickStamp = (label, stampColor) => {
@@ -591,7 +712,7 @@ export function WhiteboardCanvas() {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
     drawStampBadge(ctx, 100, 140, label, stampColor);
-    autoSaveCanvas();
+    autoSaveCanvas(true);
   };
 
   const handleClearCanvas = () => {
@@ -606,7 +727,7 @@ export function WhiteboardCanvas() {
       ctx.fillStyle = canvasBackground;
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       autoSaveCanvas();
-      socketService.emitCanvasClear({ orgId: currentOrg.id });
+      socketService.emitCanvasClear({ orgId: currentOrgIdStr });
       toast.success('Whiteboard cleared', 'All drawings and stencils have been reset.');
     }
     setIsClearDialogOpen(false);

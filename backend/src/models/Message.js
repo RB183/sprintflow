@@ -3,19 +3,25 @@ const mongoose = require('mongoose');
 const messageSchema = new mongoose.Schema(
   {
     channelId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Channel',
+      type: String,
       required: true,
       index: true,
     },
     senderId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      type: String,
       required: true,
     },
     senderName: {
       type: String,
       required: true,
+    },
+    userAvatar: {
+      type: String,
+      default: '',
+    },
+    role: {
+      type: String,
+      default: 'member',
     },
     text: {
       type: String,
