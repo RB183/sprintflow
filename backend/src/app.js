@@ -57,6 +57,21 @@ app.use(sanitize);
 // General rate limiter
 app.use('/api', apiRateLimiter);
 
+// Root API Welcome & Status
+app.get('/', (req, res) => {
+  res.json({
+    name: 'SprintFlow Enterprise Backend API',
+    status: 'online',
+    version: '1.0.0',
+    endpoints: {
+      health: '/health',
+      api: '/api',
+    },
+    client: 'https://sprintflow-two.vercel.app',
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Health Check
 app.get('/health', (req, res) => {
   res.json({ status: 'healthy', timestamp: new Date().toISOString() });
