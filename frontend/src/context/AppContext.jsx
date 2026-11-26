@@ -9,6 +9,10 @@ import confetti from 'canvas-confetti';
 const AppContext = createContext(null);
 
 const createEntityId = (prefix) => `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+const normalizeCard = (card) => ({
+  ...card,
+  id: card._id?.toString() || card.id,
+});
 
 export function AppProvider({ children }) {
   const toast = useToast();
@@ -272,15 +276,28 @@ export function AppProvider({ children }) {
 
     const handleRemoteCardCreated = (data) => {
       if (data?.card?.id) {
-        setTasks((prev) => [data.card, ...prev.filter((t) => t.id !== data.card.id)]);
+        setTasks((prev) => [
+          data.card,
+          ...prev.filter((t) => t.id !== data.card.id && t.key !== data.card.key),
+        ]);
       }
     };
 
     const handleRemoteCardUpdated = (data) => {
       if (data?.card?.id) {
-        setTasks((prev) =>
-          prev.map((t) => (t.id === data.card.id ? { ...t, ...data.card } : t))
-        );
+        if (data.card.archivedAt) {
+          setTasks((prev) =>
+            prev.filter((t) => t.id !== data.card.id && t.key !== data.card.key)
+          );
+          return;
+        }
+        setTasks((prev) => {
+          const exists = prev.some((t) => t.id === data.card.id || t.key === data.card.key);
+          if (!exists) return [data.card, ...prev];
+          return prev.map((t) =>
+            t.id === data.card.id || t.key === data.card.key ? { ...t, ...data.card } : t
+          );
+        });
       }
     };
 
@@ -753,8 +770,8 @@ export function AppProvider({ children }) {
   };
 
   // Card & Kanban operations
-  const currentOrgTasks = tasks.filter((t) => t.orgId === currentOrg.id);
-  const personalTasks = tasks.filter((t) => t.assigneeId === currentUser?.id);
+  const currentOrgTasks = tasks.filter((t) => t.orgId === currentOrg.id && !t.archivedAt);
+  const personalTasks = tasks.filter((t) => t.assigneeId === currentUser?.id && !t.archivedAt);
 
   const addTask = async (payload) => {
     const targetOrgId = payload.orgId || currentOrg.id;
@@ -781,14 +798,32 @@ export function AppProvider({ children }) {
 
     setTasks((prev) => [newTask, ...prev]);
 
-    socketService.emitCardCreated({
-      boardId: targetOrgId,
-      card: newTask,
+    try {
+      const response = await api.createCard(newTask);
+      const savedCard = response?.card ? normalizeCard(response.card) : newTask;
+
+      if (savedCard.id !== newTask.id) {
+        setTasks((prev) => prev.map((task) => (task.id === newTask.id ? savedCard : task)));
+      }
+
+      socketService.emitCardCreated({
+        boardId: targetOrgId,
+        card: savedCard,
+        user: currentUser || { name: 'Teammate' },
+      });
+      return savedCard;
+    } catch (err) {
+      toast.error('Failed to save task', err.message || 'Please try again.');
+      return newTask;
+    }
+  };
+
+  const broadcastTaskUpdate = (card) => {
+    socketService.emitCardUpdated({
+      boardId: card.orgId,
+      card,
       user: currentUser || { name: 'Teammate' },
     });
-
-    api.createCard(newTask).catch(() => {});
-    return newTask;
   };
 
   const updateTask = (taskId, updates) => {
@@ -798,11 +833,7 @@ export function AppProvider({ children }) {
 
     const updatedTask = tasks.find((t) => t.id === taskId);
     if (updatedTask) {
-      socketService.emitCardUpdated({
-        boardId: updatedTask.orgId,
-        card: { ...updatedTask, ...updates },
-        user: currentUser || { name: 'Teammate' },
-      });
+      broadcastTaskUpdate({ ...updatedTask, ...updates });
       api.updateCard(taskId, updates).catch(() => {});
     }
   };
@@ -816,9 +847,49 @@ export function AppProvider({ children }) {
     }
   };
 
-  const archiveDoneTasks = (orgId) => {
+  const archiveTask = async (taskId) => {
+    const response = await api.archiveCard(taskId);
+    if (!response?.card) throw new Error('The task could not be archived.');
+    const archivedCard = normalizeCard(response.card);
+    setTasks((prev) =>
+      prev.filter((task) => task.id !== taskId && task.key !== archivedCard.key)
+    );
+    broadcastTaskUpdate(archivedCard);
+    return archivedCard;
+  };
+
+  const restoreTask = async (taskId) => {
+    const response = await api.restoreCard(taskId);
+    if (!response?.card) throw new Error('The task could not be restored.');
+    const restoredCard = {
+      ...normalizeCard(response.card),
+      archivedAt: null,
+    };
+    setTasks((prev) => [
+      restoredCard,
+      ...prev.filter((task) => task.id !== restoredCard.id && task.key !== restoredCard.key),
+    ]);
+    broadcastTaskUpdate(restoredCard);
+    return restoredCard;
+  };
+
+  const archiveDoneTasks = async (orgId) => {
     const activeOrgId = orgId || currentOrg.id;
-    setTasks((prev) => prev.filter((t) => !(t.orgId === activeOrgId && t.status === 'done')));
+    const response = await api.archiveDoneCards(activeOrgId);
+    const archivedCards = response?.cards || [];
+    const archivedIds = new Set(archivedCards.map((card) => card._id?.toString()));
+    const archivedKeys = new Set(archivedCards.map((card) => card.key));
+    setTasks((prev) =>
+      prev.filter(
+        (task) =>
+          task.orgId !== activeOrgId ||
+          (!archivedIds.has(task.id) && !archivedKeys.has(task.key))
+      )
+    );
+    archivedCards.forEach((card) => {
+      broadcastTaskUpdate(normalizeCard(card));
+    });
+    return archivedCards.length;
   };
 
   const handleDragEnd = (result) => {
@@ -1040,6 +1111,8 @@ export function AppProvider({ children }) {
         addTask,
         updateTask,
         deleteTask,
+        archiveTask,
+        restoreTask,
         archiveDoneTasks,
         handleDragEnd,
         // Plans & Sprint Capacity

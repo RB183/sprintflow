@@ -58,6 +58,10 @@ router.patch('/notifications/read-all', notificationController.markAllAsRead);
 router.patch('/notifications/:id/read', notificationController.markAsRead);
 
 // Cards / Kanban
+router.get('/orgs/:orgId/activity', cardController.getOrganizationActivity);
+router.patch('/cards/archive-done', cardController.archiveDoneCards);
+router.patch('/cards/:id/archive', cardController.archiveCard);
+router.patch('/cards/:id/restore', cardController.restoreCard);
 router.get('/cards', cardController.getCards);
 router.post('/cards', cardController.createCard);
 router.put('/cards/:id', cardController.updateCard);

@@ -211,6 +211,33 @@ class ApiService {
     });
   }
 
+  archiveCard(cardId) {
+    return this.authRequest(`/cards/${encodeURIComponent(cardId)}/archive`, {
+      method: 'PATCH',
+    });
+  }
+
+  restoreCard(cardId) {
+    return this.authRequest(`/cards/${encodeURIComponent(cardId)}/restore`, {
+      method: 'PATCH',
+    });
+  }
+
+  archiveDoneCards(orgId) {
+    return this.authRequest('/cards/archive-done', {
+      method: 'PATCH',
+      body: JSON.stringify({ orgId }),
+    });
+  }
+
+  getArchivedCards(orgId) {
+    return this.authRequest(`/cards?orgId=${encodeURIComponent(orgId)}&archived=true`);
+  }
+
+  getOrganizationActivity(orgId) {
+    return this.authRequest(`/orgs/${encodeURIComponent(orgId)}/activity`);
+  }
+
   async reorderCards(cardUpdates) {
     return this.request('/cards/reorder', {
       method: 'PATCH',

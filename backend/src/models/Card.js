@@ -92,6 +92,11 @@ const cardSchema = new mongoose.Schema(
       type: String,
       default: null,
     },
+    archivedAt: {
+      type: Date,
+      default: null,
+      index: true,
+    },
     comments: [commentSchema],
     acceptanceCriteria: [checklistSchema],
     attachments: [attachmentSchema],

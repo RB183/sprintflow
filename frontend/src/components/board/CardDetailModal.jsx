@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
   X,
   Trash2,
+  Archive,
   Calendar,
   User,
   MessageSquare,
@@ -29,13 +30,13 @@ export function CardDetailModal({ taskId, isOpen, onClose }) {
     tasks,
     allTasks,
     updateTask,
-    deleteTask,
+    archiveTask,
     members,
     currentUser,
     currentOrg,
   } = useApp();
   const toast = useToast();
-  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
 
   const taskList = allTasks || tasks || [];
   const currentTask = taskList.find((t) => t.id === taskId);
@@ -205,15 +206,18 @@ export function CardDetailModal({ taskId, isOpen, onClose }) {
     updateTask(currentTask.id, { tags: updated });
   };
 
-  const handleDeleteCard = () => {
-    setIsDeleteDialogOpen(true);
+  const handleArchiveCard = () => {
+    setIsArchiveDialogOpen(true);
   };
 
-  const handleConfirmDelete = () => {
-    deleteTask(currentTask.id);
-    toast.success('Task deleted', `"${currentTask.title}" was permanently removed.`);
-    setIsDeleteDialogOpen(false);
-    onClose();
+  const handleConfirmArchive = async () => {
+    try {
+      await archiveTask(currentTask.id);
+      toast.success('Task archived', `"${currentTask.title}" can be restored from the archive.`);
+      onClose();
+    } catch (err) {
+      toast.error('Failed to archive task', err.message || 'Please try again.');
+    }
   };
 
   const formatFileSize = (bytes) => {
@@ -246,11 +250,11 @@ export function CardDetailModal({ taskId, isOpen, onClose }) {
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={handleDeleteCard}
-              className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors cursor-pointer"
-              title="Delete Card"
+              onClick={handleArchiveCard}
+              className="p-1.5 text-slate-400 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-950/40 rounded-lg transition-colors cursor-pointer"
+              title="Archive Card"
             >
-              <Trash2 className="w-4 h-4" />
+              <Archive className="w-4 h-4" />
             </button>
             <button
               type="button"
@@ -645,14 +649,14 @@ export function CardDetailModal({ taskId, isOpen, onClose }) {
       </div>
 
       <ConfirmDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={() => setIsDeleteDialogOpen(false)}
-        onConfirm={handleConfirmDelete}
-        title="Delete Task"
-        description={`Are you sure you want to permanently delete "${currentTask?.title || 'this task'}"? All checklist items, comments, and attachments will be deleted.`}
-        confirmText="Delete Task"
+        isOpen={isArchiveDialogOpen}
+        onClose={() => setIsArchiveDialogOpen(false)}
+        onConfirm={handleConfirmArchive}
+        title="Archive Task"
+        description={`Archive "${currentTask?.title || 'this task'}"? You can restore it later from the archive.`}
+        confirmText="Archive Task"
         cancelText="Cancel"
-        variant="danger"
+        variant="warning"
       />
     </div>
   );

@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   AlertTriangle,
   X,
-  Trash2,
   Search,
   Filter,
   Download,
@@ -21,13 +20,16 @@ import { useApp } from '../../context/AppContext';
 import { useToast } from '../../context/ToastContext';
 import { ConfirmDialog } from '../common/ConfirmDialog';
 import { CardDetailModal } from './CardDetailModal';
+import { ActivityTimeline } from './ActivityTimeline';
+import { ArchivedCardsModal } from './ArchivedCardsModal';
 
 export function HackerKanbanBoard() {
   const {
     tasks,
     handleDragEnd,
     addTask,
-    deleteTask,
+    archiveTask,
+    restoreTask,
     archiveDoneTasks,
     currentOrg,
     currentUser,
@@ -40,7 +42,7 @@ export function HackerKanbanBoard() {
   const [newTitle, setNewTitle] = useState('');
   const [newPriority, setNewPriority] = useState('medium');
   const [isArchiveDialogOpen, setIsArchiveDialogOpen] = useState(false);
-  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [taskToArchive, setTaskToArchive] = useState(null);
 
   // Filter & Search states
   const [searchQuery, setSearchQuery] = useState('');
@@ -49,6 +51,8 @@ export function HackerKanbanBoard() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [overdueOnly, setOverdueOnly] = useState(false);
   const [isExportMenuOpen, setIsExportMenuOpen] = useState(false);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
+  const [isArchivedCardsOpen, setIsArchivedCardsOpen] = useState(false);
 
   const exportMenuRef = useRef(null);
 
@@ -86,8 +90,11 @@ export function HackerKanbanBoard() {
         const query = searchQuery.toLowerCase();
         const matchesTitle = task.title?.toLowerCase().includes(query);
         const matchesKey = task.key?.toLowerCase().includes(query);
+        const matchesDescription = task.description?.toLowerCase().includes(query);
         const matchesTag = task.tags?.some((t) => t.toLowerCase().includes(query));
-        if (!matchesTitle && !matchesKey && !matchesTag) return false;
+        const assigneeName = members.find((member) => member.id === task.assigneeId)?.name;
+        const matchesAssignee = assigneeName?.toLowerCase().includes(query);
+        if (!matchesTitle && !matchesKey && !matchesDescription && !matchesTag && !matchesAssignee) return false;
       }
 
       // Priority filter
@@ -115,7 +122,7 @@ export function HackerKanbanBoard() {
 
       return true;
     });
-  }, [tasks, searchQuery, priorityFilter, assigneeFilter, typeFilter, overdueOnly, currentUser, todayStr]);
+  }, [tasks, searchQuery, priorityFilter, assigneeFilter, typeFilter, overdueOnly, currentUser, todayStr, members]);
 
   const handleCreateCard = (status) => {
     if (!newTitle.trim()) return;
@@ -139,11 +146,22 @@ export function HackerKanbanBoard() {
     setIsArchiveDialogOpen(true);
   };
 
-  const handleConfirmArchive = () => {
-    const doneCount = tasks.filter((t) => t.status === 'done').length;
-    archiveDoneTasks(currentOrg.id);
-    toast.success('Tasks archived', `Archived ${doneCount} completed task${doneCount > 1 ? 's' : ''}.`);
-    setIsArchiveDialogOpen(false);
+  const handleConfirmArchive = async () => {
+    try {
+      const archivedCount = await archiveDoneTasks(currentOrg.id);
+      if (archivedCount > 0) {
+        toast.success(
+          'Tasks archived',
+          `Archived ${archivedCount} completed task${archivedCount > 1 ? 's' : ''}.`
+        );
+      } else {
+        toast.info('No completed tasks', 'There are no completed tasks to archive.');
+      }
+    } catch (err) {
+      toast.error('Failed to archive tasks', err.message || 'Please try again.');
+    } finally {
+      setIsArchiveDialogOpen(false);
+    }
   };
 
   // Export to CSV
@@ -217,7 +235,7 @@ export function HackerKanbanBoard() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search by title, key (e.g. CYB-01), or #tag..."
+              placeholder="Search title, key, description, tag, or assignee..."
               className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-[#0052cc]"
             />
             {searchQuery && (
@@ -231,8 +249,28 @@ export function HackerKanbanBoard() {
             )}
           </div>
 
-          {/* Right: Quick Actions (Export, Archive Done) */}
+          {/* Right: Quick Actions */}
           <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={() => setIsActivityOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition-colors cursor-pointer"
+              title="View recent workspace activity"
+            >
+              <Clock className="w-3.5 h-3.5 text-[#0052cc]" />
+              <span>Activity</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setIsArchivedCardsOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-xs font-bold text-slate-700 transition-colors cursor-pointer"
+              title="View and restore archived cards"
+            >
+              <Archive className="w-3.5 h-3.5 text-slate-500" />
+              <span>View Archive</span>
+            </button>
+
             {/* Export Dropdown */}
             <div ref={exportMenuRef} className="relative">
               <button
@@ -562,12 +600,12 @@ export function HackerKanbanBoard() {
                                       type="button"
                                       onClick={(e) => {
                                         e.stopPropagation();
-                                        setTaskToDelete(task);
+                                        setTaskToArchive(task);
                                       }}
                                       className="text-slate-400 hover:text-rose-600 transition-colors p-0.5 cursor-pointer"
-                                      title="Delete task"
+                                      title="Archive task"
                                     >
-                                      <Trash2 className="w-3.5 h-3.5" />
+                                      <Archive className="w-3.5 h-3.5" />
                                     </button>
                                   </div>
                                 </div>
@@ -593,6 +631,19 @@ export function HackerKanbanBoard() {
         onClose={() => setSelectedTaskId(null)}
       />
 
+      <ActivityTimeline
+        isOpen={isActivityOpen}
+        onClose={() => setIsActivityOpen(false)}
+        orgId={currentOrg?.id}
+      />
+
+      <ArchivedCardsModal
+        isOpen={isArchivedCardsOpen}
+        onClose={() => setIsArchivedCardsOpen(false)}
+        orgId={currentOrg?.id}
+        onRestore={restoreTask}
+      />
+
       {/* Archive Confirmation Dialog */}
       <ConfirmDialog
         isOpen={isArchiveDialogOpen}
@@ -605,22 +656,26 @@ export function HackerKanbanBoard() {
         variant="warning"
       />
 
-      {/* Quick Delete Card Confirmation Dialog */}
+      {/* Quick Archive Card Confirmation Dialog */}
       <ConfirmDialog
-        isOpen={Boolean(taskToDelete)}
-        onClose={() => setTaskToDelete(null)}
-        onConfirm={() => {
-          if (taskToDelete) {
-            deleteTask(taskToDelete.id);
-            toast.success('Task deleted', `"${taskToDelete.title}" was deleted.`);
-            setTaskToDelete(null);
+        isOpen={Boolean(taskToArchive)}
+        onClose={() => setTaskToArchive(null)}
+        onConfirm={async () => {
+          if (!taskToArchive) return;
+          try {
+            await archiveTask(taskToArchive.id);
+            toast.success('Task archived', `"${taskToArchive.title}" can be restored from the archive.`);
+          } catch (err) {
+            toast.error('Failed to archive task', err.message || 'Please try again.');
+          } finally {
+            setTaskToArchive(null);
           }
         }}
-        title="Delete Task"
-        description={`Are you sure you want to permanently delete "${taskToDelete?.title || 'this task'}"? This action cannot be undone.`}
-        confirmText="Delete Task"
+        title="Archive Task"
+        description={`Archive "${taskToArchive?.title || 'this task'}"? You can restore it later from the archive.`}
+        confirmText="Archive Task"
         cancelText="Cancel"
-        variant="danger"
+        variant="warning"
       />
     </div>
   );

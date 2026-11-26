@@ -20,6 +20,9 @@ A high-performance, 100% free agile project management platform and collaborativ
 - **📋 Personal Workspace**: Aggregated cross-organizational task feed showing all assigned tasks with instant status cycling.
 - **🏢 Multi-Organization / Team Spaces**: Effortless team switching with role-based permissions (*Admin* vs *Member*).
 - **📊 Drag & Drop Kanban Board**: Fluid vertical and horizontal card movements powered by `@hello-pangea/dnd`.
+- **🔎 Board Search & Filters**: Find cards by title, key, description, tag, or assignee; filter by priority, type, assignee, and overdue status.
+- **🗃️ Card Archive & Restore**: Archive individual or completed cards and restore them from the workspace archive.
+- **🕒 Workspace Activity Timeline**: Review recent card creation, edits, moves, archiving, and restores.
 - **🗺️ Sprint Roadmap Timeline**: Visual epic milestones, execution progress bars, and deliverable checklists.
 - **🎨 Live Drawing Whiteboard (Canvas)**: HTML5 canvas for system architectures, flowcharts, decision diamonds, and connectors with PNG export and cloud auto-save.
 - **💬 Real-Time Team Chat**: Channel-based team communication stream synced via WebSockets.
