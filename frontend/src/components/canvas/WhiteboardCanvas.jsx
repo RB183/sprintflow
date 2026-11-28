@@ -77,7 +77,7 @@ export function WhiteboardCanvas() {
 
   const currentOrgIdStr = (currentOrg?.id || currentOrg?._id || 'default').toString();
   const canvasBackground = theme === 'dark' ? '#0f172a' : '#ffffff';
-  const canvasStorageKey = `canvas_${theme === 'dark' ? 'dark' : 'light'}_${currentOrgIdStr}`;
+  const canvasStorageKey = `canvas_v2_${theme === 'dark' ? 'dark' : 'light'}_${currentOrgIdStr}`;
 
   const colors = [
     { name: 'Royal Blue', hex: '#0052cc' },
@@ -124,8 +124,6 @@ export function WhiteboardCanvas() {
       const img = new Image();
       img.onload = () => ctx.drawImage(img, 0, 0);
       img.src = saved;
-    } else {
-      drawDefaultArchitecture(ctx);
     }
   }, [canvasBackground, canvasStorageKey, theme]);
 
@@ -220,46 +218,6 @@ export function WhiteboardCanvas() {
     document.addEventListener('fullscreenchange', handleFullscreenChange);
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
-
-  const drawDefaultArchitecture = (ctx) => {
-    const isDark = theme === 'dark';
-
-    // 1. Client App Node
-    drawServerBox(ctx, 80, 260, 160, 90, 'React Client App', 'WebSockets :443', '#0052cc', isDark);
-
-    // Arrow to Load Balancer
-    drawConnectorArrow(ctx, 240, 305, 330, 305, '#0052cc');
-
-    // 2. Load Balancer Node
-    drawLoadBalancerNode(ctx, 330, 255, 140, 100, 'Cloud Gateway', 'Envoy / ALB', '#06b6d4', isDark);
-
-    // Arrow to Microservice
-    drawConnectorArrow(ctx, 470, 305, 560, 305, '#06b6d4');
-
-    // 3. Node.js Microservice
-    drawServerBox(ctx, 560, 260, 170, 90, 'API Microservice', 'Express & JWT', '#8b5cf6', isDark);
-
-    // Arrow up to Cache
-    drawConnectorArrow(ctx, 645, 260, 645, 180, '#f59e0b');
-
-    // 4. Redis Cache
-    drawCacheNode(ctx, 570, 110, 150, 70, 'Redis Cache', 'TTL: 3600s', '#f59e0b', isDark);
-
-    // Arrow right to Database
-    drawConnectorArrow(ctx, 730, 305, 820, 305, '#10b981');
-
-    // 5. Database Cylinder
-    drawDatabaseCylinder(ctx, 820, 250, 160, 110, 'MongoDB Atlas', 'Sharded Cluster', '#10b981', isDark);
-
-    // Title label
-    ctx.fillStyle = isDark ? '#f8fafc' : '#0f172a';
-    ctx.font = 'bold 16px sans-serif';
-    ctx.fillText('⚡ Production System Design & Multi-Tenant Architecture', 80, 70);
-
-    ctx.fillStyle = isDark ? '#94a3b8' : '#64748b';
-    ctx.font = '12px sans-serif';
-    ctx.fillText('Real-Time Collaboration Mesh • Sub-50ms Latency', 80, 95);
-  };
 
   // Helper Drawing Functions for Dedicated System Shapes
   const drawServerBox = (ctx, x, y, w, h, title, sub, strokeColor, isDark) => {
