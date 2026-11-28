@@ -10,6 +10,8 @@ A high-performance, 100% free agile project management platform and collaborativ
 ## 🌐 Live Deployments
 
 - **🚀 Web Application (Frontend):** [https://sprintflow-two.vercel.app/](https://sprintflow-two.vercel.app/)
+- Live Backend API URL: https://sprintflow-backend-knol.onrender.com
+- Live Backend Health Check: https://sprintflow-backend-knol.onrender.com/health 
 
 ---
 
