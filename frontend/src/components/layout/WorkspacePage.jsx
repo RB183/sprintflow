@@ -1274,13 +1274,12 @@ function ProjectList({ orgs, onOpen, onStar, starredOrgIds, empty, onDeleteSpace
                   onClick={() => onOpen(org.id)}
                   className="text-xs font-bold text-[#0052cc] dark:text-blue-400 hover:text-[#0041a8] dark:hover:text-blue-300 cursor-pointer inline-flex items-center"
                 >
-                  Open project <ArrowRight className="ml-1 inline h-3.5 w-3.5" />
+                  Open space <ArrowRight className="ml-1 inline h-3.5 w-3.5" />
                 </button>
-                {isAdmin && (
-                  <span className="text-[10px] font-semibold text-slate-400 dark:text-slate-500">
-                    Admin access
-                  </span>
-                )}
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 bg-slate-50 dark:bg-slate-800/80 px-2 py-0.5 rounded-md border border-slate-200 dark:border-slate-700">
+                  <Users className="w-3 h-3 text-[#0052cc] dark:text-blue-400" />
+                  <span>{org.memberCount || org.members?.length || 1} { (org.memberCount || org.members?.length || 1) === 1 ? 'member' : 'members' }</span>
+                </span>
               </div>
             </div>
           );

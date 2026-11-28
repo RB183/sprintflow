@@ -16,6 +16,7 @@ import { ConfirmDialog } from '../common/ConfirmDialog';
 export function TeamSpaceHeader() {
   const { currentOrg, teamTab, setTeamTab, members, setIsMetricsOpen, currentUser, deleteSpace } = useApp();
   const [isInviteOpen, setIsInviteOpen] = useState(false);
+  const [modalInitialTab, setModalInitialTab] = useState('members');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
   const isOwner = Boolean(
@@ -54,12 +55,35 @@ export function TeamSpaceHeader() {
 
         {/* Member presence & Invite button */}
         <div className="flex items-center gap-2.5">
-          <div className="flex items-center gap-2 text-xs text-slate-600 bg-white border border-slate-200 px-3 py-1.5 rounded-lg shadow-xs">
-            <Users className="w-4 h-4 text-[#0052cc]" />
+          <button
+            type="button"
+            onClick={() => {
+              setModalInitialTab('members');
+              setIsInviteOpen(true);
+            }}
+            className="flex items-center gap-2 text-xs text-slate-700 hover:text-[#0052cc] bg-white border border-slate-200 hover:border-blue-300 px-3 py-1.5 rounded-lg shadow-xs transition-all cursor-pointer group"
+            title="Click to view all members in this space"
+          >
+            {members.length > 0 && (
+              <div className="flex items-center -space-x-1.5 overflow-hidden">
+                {members.slice(0, 3).map((m) => (
+                  <img
+                    key={m.id || m.userId}
+                    src={m.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                    alt={m.name}
+                    className="w-4.5 h-4.5 rounded-full object-cover border border-white"
+                  />
+                ))}
+              </div>
+            )}
+            <Users className="w-3.5 h-3.5 text-[#0052cc]" />
             <span className="font-semibold">{members.length} {members.length === 1 ? 'Member' : 'Members'}</span>
             <span className="text-slate-300">|</span>
-            <span className="text-emerald-600 font-bold">● Live</span>
-          </div>
+            <span className="text-emerald-600 font-bold flex items-center gap-1">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live
+            </span>
+          </button>
 
           <button
             type="button"
@@ -71,14 +95,33 @@ export function TeamSpaceHeader() {
             <span>Analytics</span>
           </button>
 
-          <button
-            type="button"
-            onClick={() => setIsInviteOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0052cc] text-xs font-bold border border-blue-200 transition-colors cursor-pointer shadow-xs"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Invite</span>
-          </button>
+          {isAdmin ? (
+            <button
+              type="button"
+              onClick={() => {
+                setModalInitialTab('invite');
+                setIsInviteOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-50 hover:bg-blue-100 text-[#0052cc] text-xs font-bold border border-blue-200 transition-colors cursor-pointer shadow-xs"
+              title="Invite new members to this space"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Invite</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => {
+                setModalInitialTab('members');
+                setIsInviteOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold border border-slate-200 transition-colors cursor-pointer shadow-xs"
+              title="View all members in this space"
+            >
+              <Users className="w-3.5 h-3.5 text-[#0052cc]" />
+              <span>Members ({members.length})</span>
+            </button>
+          )}
 
           {isAdmin && (
             <button
@@ -94,7 +137,11 @@ export function TeamSpaceHeader() {
         </div>
       </div>
 
-      <InviteMemberModal isOpen={isInviteOpen} onClose={() => setIsInviteOpen(false)} />
+      <InviteMemberModal
+        isOpen={isInviteOpen}
+        onClose={() => setIsInviteOpen(false)}
+        initialTab={modalInitialTab}
+      />
 
       <ConfirmDialog
         isOpen={isDeleteDialogOpen}

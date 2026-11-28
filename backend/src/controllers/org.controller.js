@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 const Organization = require('../models/Organization');
 const OrgMember = require('../models/OrgMember');
 const User = require('../models/User');
@@ -262,14 +263,22 @@ exports.getSpaceMembers = async (req, res, next) => {
     const orgId = req.params.orgId || req.params.spaceId;
     const userId = req.user.id;
 
-    const org = await Organization.findById(orgId)
-      .populate('members.userId', 'name email avatar title')
-      .populate('ownerId', 'name email avatar title');
+    if (!orgId) return res.status(400).json({ message: 'Space ID is required' });
+
+    const org = mongoose.Types.ObjectId.isValid(orgId)
+      ? await Organization.findById(orgId)
+          .populate('members.userId', 'name email avatar title')
+          .populate('ownerId', 'name email avatar title')
+      : await Organization.findOne({ slug: orgId })
+          .populate('members.userId', 'name email avatar title')
+          .populate('ownerId', 'name email avatar title');
 
     if (!org) return res.status(404).json({ message: 'Space not found' });
 
     // Also check OrgMember collection for any synchronized records
-    const orgMembers = await OrgMember.find({ orgId }).populate('userId', 'name email avatar title');
+    const orgMembers = mongoose.Types.ObjectId.isValid(orgId)
+      ? await OrgMember.find({ orgId }).populate('userId', 'name email avatar title')
+      : [];
 
     const memberMap = new Map();
 

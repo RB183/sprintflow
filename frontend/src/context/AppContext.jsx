@@ -424,6 +424,21 @@ export function AppProvider({ children }) {
         if (res?.apps) setApps(res.apps);
       })
       .catch(() => {});
+
+    // Fetch and sync space members for the active space
+    api.getSpaceMembers(currentOrgId)
+      .then((res) => {
+        if (res?.members && Array.isArray(res.members)) {
+          setOrgs((prev) =>
+            prev.map((s) =>
+              s.id === currentOrgId
+                ? { ...s, members: res.members, memberCount: res.members.length }
+                : s
+            )
+          );
+        }
+      })
+      .catch((e) => console.warn('[AppContext] Failed to load space members:', e.message));
   }, [currentOrgId, currentUser]);
 
   // Navigation handlers
@@ -983,17 +998,37 @@ export function AppProvider({ children }) {
     }
   };
 
+  const refreshSpaceMembers = useCallback(async (spaceId = currentOrgId) => {
+    if (!spaceId) return [];
+    try {
+      const res = await api.getSpaceMembers(spaceId);
+      if (res?.members && Array.isArray(res.members)) {
+        setOrgs((prev) =>
+          prev.map((s) =>
+            s.id === spaceId
+              ? { ...s, members: res.members, memberCount: res.members.length }
+              : s
+          )
+        );
+        return res.members;
+      }
+    } catch (e) {
+      console.warn('[AppContext] Failed to refresh space members:', e.message);
+    }
+    return [];
+  }, [currentOrgId]);
+
   // Members list for current space
   const currentSpaceMembers = (currentOrg.members || []).map((m) => {
     const user = usersList.find((u) => (u.id || u._id) === (m.userId || m.id));
     return {
       id: m.userId || m.id,
       userId: m.userId || m.id,
-      name: user?.name || m.name || 'Team Member',
-      avatar: user?.avatar || m.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+      name: m.name && m.name !== 'Member' ? m.name : user?.name || m.name || 'Team Member',
+      avatar: m.avatar || user?.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
       role: m.role || 'member',
-      title: user?.title || m.title || 'Team Member',
-      email: user?.email || m.email || '',
+      title: m.title && m.title !== 'Team Member' ? m.title : user?.title || m.title || 'Team Member',
+      email: m.email || user?.email || '',
     };
   });
 
@@ -1081,6 +1116,7 @@ export function AppProvider({ children }) {
         markAllNotificationsRead,
         clearNotifications,
         refreshSpaces: fetchOrganizations,
+        refreshSpaceMembers,
         // Members & Users
         members: currentSpaceMembers.length > 0 ? currentSpaceMembers : usersList,
         allUsers: usersList,
