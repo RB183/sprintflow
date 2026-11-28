@@ -7,6 +7,11 @@ const messageSchema = new mongoose.Schema(
       required: true,
       index: true,
     },
+    orgId: {
+      type: String,
+      index: true,
+      default: '',
+    },
     senderId: {
       type: String,
       required: true,

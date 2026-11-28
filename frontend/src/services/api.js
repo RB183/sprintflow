@@ -242,8 +242,8 @@ class ApiService {
     return this.request(`/orgs/${orgId}/channels`);
   }
 
-  async getMessages(channelId) {
-    return this.request(`/channels/${channelId}/messages`);
+  async getMessages(channelId, orgId) {
+    return this.request(`/channels/${channelId}/messages${orgId ? `?orgId=${orgId}` : ''}`);
   }
 
   async sendMessage(channelId, text, extra = {}) {

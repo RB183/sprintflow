@@ -85,15 +85,40 @@ export function AppProvider({ children }) {
   const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
 
   // Chat
-  const [channels, setChannels] = useState([
-    { id: 'ch-general', name: 'general', description: 'Team wide announcements & discussions' },
-    { id: 'ch-dev', name: 'engineering', description: 'Architecture & technical execution' },
-  ]);
-  const [activeChannelId, setActiveChannelId] = useState('ch-general');
+  const currentOrgIdStr = (currentOrgId || 'default').toString();
+
+  const channels = useMemo(() => [
+    { id: `${currentOrgIdStr}_general`, name: 'general', description: 'Team wide announcements & discussions', orgId: currentOrgIdStr },
+    { id: `${currentOrgIdStr}_engineering`, name: 'engineering', description: 'Architecture & technical execution', orgId: currentOrgIdStr },
+  ], [currentOrgIdStr]);
+
+  const [activeChannelId, setActiveChannelId] = useState(() => `${currentOrgIdStr}_general`);
+
+  useEffect(() => {
+    if (currentOrgIdStr) {
+      setActiveChannelId(`${currentOrgIdStr}_general`);
+    }
+  }, [currentOrgIdStr]);
+
   const [chatMessages, setChatMessages] = useState(() => {
-    const saved = localStorage.getItem('sprintflow_light_chat');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem(`sprintflow_chat_${currentOrgIdStr}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
+
+  // Reload chat messages whenever currentOrgIdStr changes
+  useEffect(() => {
+    if (!currentOrgIdStr) return;
+    try {
+      const saved = localStorage.getItem(`sprintflow_chat_${currentOrgIdStr}`);
+      setChatMessages(saved ? JSON.parse(saved) : []);
+    } catch {
+      setChatMessages([]);
+    }
+  }, [currentOrgIdStr]);
 
   // Users list (Registered users from MongoDB)
   const [usersList, setUsersList] = useState([]);
@@ -293,9 +318,12 @@ export function AppProvider({ children }) {
     const handleRemoteChatMessage = (data) => {
       const msg = data?.message || data;
       if (msg && (msg.id || msg._id) && msg.text) {
+        const msgOrgId = (msg.orgId || data?.orgId || '').toString();
         const cleanMsg = {
           ...msg,
           id: (msg.id || msg._id).toString(),
+          orgId: msgOrgId,
+          channelId: (msg.channelId || data?.channelId || '').toString(),
           userName: msg.userName || msg.username || msg.senderName || 'Team Member',
           username: msg.username || msg.userName || msg.senderName || 'Team Member',
           userAvatar: msg.userAvatar || msg.avatar || '',
@@ -872,11 +900,11 @@ export function AppProvider({ children }) {
   // Chat
   const sendChatMessage = (text) => {
     if (!text.trim() || !currentUser) return;
-    const orgId = currentOrgId || currentOrg?.id || currentOrg?._id || '';
+    const orgId = (currentOrgIdStr || '').toString();
     const newMessage = {
       id: createEntityId('msg'),
       channelId: activeChannelId,
-      orgId: orgId.toString(),
+      orgId: orgId,
       userId: (currentUser.id || currentUser._id)?.toString(),
       senderClientId: tabClientIdRef.current,
       userName: currentUser.name || currentUser.username || 'User',
@@ -891,21 +919,27 @@ export function AppProvider({ children }) {
     setChatMessages((prev) => [...prev, newMessage]);
     socketService.emitChatMessage({
       channelId: activeChannelId,
-      orgId: orgId.toString(),
+      orgId: orgId,
       message: newMessage,
     });
     api.sendMessage(activeChannelId, text.trim(), {
+      orgId: orgId,
       userAvatar: currentUser.avatar || '',
       role: currentOrg?.role || 'member',
     }).catch(() => {});
   };
 
-  // Persist chat messages to local storage
+  // Persist chat messages to space-scoped local storage
   useEffect(() => {
-    try {
-      localStorage.setItem('sprintflow_light_chat', JSON.stringify(chatMessages.slice(-200)));
-    } catch (_) {}
-  }, [chatMessages]);
+    if (currentOrgIdStr) {
+      try {
+        const spaceMessages = chatMessages.filter(
+          (m) => (m.orgId || currentOrgIdStr).toString() === currentOrgIdStr
+        );
+        localStorage.setItem(`sprintflow_chat_${currentOrgIdStr}`, JSON.stringify(spaceMessages.slice(-200)));
+      } catch (_) {}
+    }
+  }, [chatMessages, currentOrgIdStr]);
 
   // Join active chat channel socket room
   useEffect(() => {
@@ -913,6 +947,32 @@ export function AppProvider({ children }) {
       socketService.joinChat(activeChannelId);
     }
   }, [activeChannelId]);
+
+  // Fetch messages from backend API on space or channel change
+  useEffect(() => {
+    if (!activeChannelId || !currentOrgIdStr || currentOrgIdStr === 'default') return;
+    api.getMessages(activeChannelId, currentOrgIdStr)
+      .then((res) => {
+        if (res?.messages && Array.isArray(res.messages)) {
+          setChatMessages((prev) => {
+            const existingIds = new Set(prev.map((m) => (m.id || m._id)?.toString()));
+            const newFromApi = res.messages
+              .filter((m) => !existingIds.has((m._id || m.id)?.toString()))
+              .map((m) => ({
+                ...m,
+                id: (m._id || m.id).toString(),
+                channelId: m.channelId || activeChannelId,
+                orgId: m.orgId || currentOrgIdStr,
+                userName: m.senderName || m.userName || 'Member',
+                username: m.senderName || m.username || 'Member',
+                timestamp: new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              }));
+            return [...prev, ...newFromApi];
+          });
+        }
+      })
+      .catch(() => {});
+  }, [activeChannelId, currentOrgIdStr]);
 
   // Auth operations
   const login = (user, token) => {
@@ -1105,7 +1165,18 @@ export function AppProvider({ children }) {
         channels,
         activeChannelId,
         setActiveChannelId,
-        chatMessages: chatMessages.filter((m) => m.channelId === activeChannelId),
+        chatMessages: chatMessages.filter((m) => {
+          const msgOrgId = (m.orgId || '').toString();
+          if (msgOrgId) {
+            return (
+              msgOrgId === currentOrgIdStr &&
+              (m.channelId === activeChannelId ||
+                m.channelId?.endsWith(activeChannelId.replace(`${currentOrgIdStr}_`, '')))
+            );
+          }
+          const isPrimaryOrg = currentOrgIdStr === (orgs[0]?.id || '').toString();
+          return isPrimaryOrg && (m.channelId === activeChannelId || m.channelId === 'ch-general');
+        }),
         sendChatMessage,
         tabClientId: tabClientIdRef.current,
         // Notifications
